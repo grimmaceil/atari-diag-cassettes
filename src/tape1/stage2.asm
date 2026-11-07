@@ -355,7 +355,7 @@ puts_st	pha
 	icl '../common/detail.asm'
 	icl '../common/xlram.asm'
 
-s_hpre	dta d' A8 DIAG  TAPE 1/3  ',$FF
+s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF
 s_hrel	dta d'LOADER AREA',$FF
 s_hsum	dta d'SUMMARY',$FF
 s_tldr	dta d'TESTING LOADER AREA $0800-$',$FF

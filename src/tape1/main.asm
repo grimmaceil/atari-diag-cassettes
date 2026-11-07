@@ -434,7 +434,7 @@ rs_bad	lda #<s_somefail
 
 ; ---------------------------------------------------------------------------
 ; Strings, in screen codes ($FF ends).
-s_hpre	dta d' A8 DIAG  TAPE 1/3  ',$FF	; header prefix (header inverts it)
+s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF	; header prefix (header inverts it)
 s_hvid	dta d'VIDEO CHECK',$FF
 s_hram	dta d'RAM TEST',$FF
 s_v1	dta d'CAN YOU READ THIS AND SEE 8 COLOR BARS?',$FF

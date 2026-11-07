@@ -658,7 +658,7 @@ NPAT	= *-pats
 	icl '../common/info.asm'
 	icl '../common/xlram.asm'
 
-s_hpre	dta d' A8 DIAG  TAPE 2/3  ',$FF
+s_hpre	dta d' A8 DIAG  BURN-IN   ',$FF
 s_hburn	dta d'BURN-IN',$FF
 s_hsum	dta d'SUMMARY',$FF
 s_legend dta d'BANK BIT  FIRST  FAILED/PASSES',$FF

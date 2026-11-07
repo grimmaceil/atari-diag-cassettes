@@ -149,8 +149,14 @@ fs_next	ldx CNT
 ; each 16K bank.
 SCR1	= [TSTART+3]&$FC
 scrcand	.byte SCR1, $3C, $7C, $BC
+	.if .def BIGSTAGE		; the 16k/48k system tapes: 16K
+	.if SCR1+4>$40
+	.error "stage too big: no screen block fits in 16K"
+	.endif
+	.else
 	.if SCR1+4>$20
 	.error "stage too big: no screen block fits in 8K"
+	.endif
 	.endif
 
 	.if .def QUICKSCR

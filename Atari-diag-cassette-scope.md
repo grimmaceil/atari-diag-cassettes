@@ -313,8 +313,8 @@ the machine can't hold, and it loads in as few steps as the RAM allows.
 | Set | For | Layout |
 |---|---|---|
 | `diag-400-*` (built) | 8K 400 | Each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. The tests are split logically and run progressively: 01 RAM, 02 ROMs (test 1), 03 input (tests 2-3), 04 ports (5-6), 05 sound and video (4, 7). Later tapes rely only on what earlier ones proved: the Y/N answers come from keys already tested. |
-| `diag-16k-*` | 16K-32K 400/800 | Fewer, larger loads. A test menu to step forward and back through the tests. |
-| `diag-48k-*` | 48K 800, XL/XE | As 16k, plus the RAM under the OS, the 130XE banks, BASIC and the self-test ROM, and the XL's two joystick ports. |
+| `diag-16k-*` (built) | 16K-32K 400/800 | 01 RAM (tape 1: stage 2 relocates to test the RAM stage 1 sat in), 02 system: all seven tests in one 68-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; idle 10 s at power-on runs all). |
+| `diag-48k-*` (built) | 48K 800, XL/XE | As 16k for now. The XL/XE extras (RAM under the OS, 130XE banks, BASIC and self-test ROM, two joystick ports, cartridge detection) are detected at run time in both sets. This set takes the RAM-hungry tests in the list below. |
 | `diag-burnin` (built) | all | One version. It sizes the RAM itself. |
 
 The system tapes are built from one `src/system/main.asm`, with a file per

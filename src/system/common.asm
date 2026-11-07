@@ -26,11 +26,41 @@ trun	lda #2			; ports: 4 on the 400/800, 2 on the XL/XE
 tst_xl	sta NPORT
 	lda #0
 	sta TIDX
+	.ifdef MENU
+	sta MRUN
+	sta MSEL
+	sta MMODE
+	lda DISPOK		; no picture: no menu, all of them in order
+	beq tst_all
+	lda #<[10*60]		; the menu runs them all if left alone 10 s
+	sta MIDLE
+	lda #>[10*60]
+	sta MIDLE+1
+	jmp menu
+tst_all	inc MMODE
+	.endif
 	jsr tnextv
 	jmp (NEXTVEC)
 
-; tend: the end of a test: its result, then the next one on the list.
-tend	jsr tnextv
+; tend: the end of a test: its result, then the next one on the list (from
+; the menu: back to the menu, the next test highlighted).
+tend	.ifdef MENU
+	ldx TEST
+	lda bitn-1,x
+	ora MRUN
+	sta MRUN
+	.endif
+	jsr tnextv
+	.ifdef MENU
+	lda MMODE
+	bne te_x
+	inc MSEL
+	lda #<menu
+	sta NEXTVEC
+	lda #>menu
+	sta NEXTVEC+1
+te_x
+	.endif
 	jmp tresult
 
 ; tnextv: NEXTVEC = the next tlist entry.
@@ -230,7 +260,13 @@ redraw	= tshow			; scrtoggle's text screen
 ; A = test, B = item; all passed: one long flash per test.
 final	lda #8			; tshow, as redraw, shows the results from here
 	sta TEST
+	.ifdef MENU
+	lda #<menu		; then back to the menu
+	sta CONTVEC
+	lda #>menu
+	.else
 	lda #0
+	.endif
 	sta CONTVEC+1
 	ldx #0
 fi_cnt	lda ttests,x
@@ -248,6 +284,178 @@ fi_lp	lda BADMASK,x
 	bne fi_lp
 	jmp pass
 fi_bad	jmp report
+
+	.ifdef MENU
+; ---------------------------------------------------------------------------
+; The test menu (16k/48k sets): every test on the tape with its state, then
+; the results line. START runs the highlighted line, SELECT moves down,
+; OPTION up; keys 1-7 run that test. After a test it comes back here with
+; the next one highlighted, so START, START... walks the tests forward. Left
+; alone 10 s at power-on, it runs them all in order, then the results and
+; the final code.
+MSEL	= BSS+$EE		; highlighted line (index into ttests; MNT = results)
+MMODE	= BSS+$EF		; nonzero: running all of them in order
+MRUN	= BSS+$F0		; tests run so far, bit per test number
+MIDLE	= BSS+$F1		; 2: frames left before running all (0 = off)
+MNT	= BSS+$F3		; tests on the tape
+
+menu	lda #0
+	sta MMODE
+	jsr mdraw
+	jsr waitrel
+mn_lp	jsr vsync
+	lda MIDLE		; the power-on countdown
+	ora MIDLE+1
+	beq mn_in
+	lda MIDLE
+	bne mn_dec
+	dec MIDLE+1
+mn_dec	dec MIDLE
+	lda MIDLE
+	ora MIDLE+1
+	bne mn_in
+	lda #0			; ran out: all of them, from the first
+	sta MSEL
+	inc MMODE
+	jmp mgo
+mn_in	lda CONSOL
+	eor #7
+	and #7
+	bne mn_con
+	lda SKSTAT		; a key: 1-7 runs that test
+	and #4
+	bne mn_lp
+	lda KBCODE
+	and #$3F
+	ldx #6
+mn_dig	cmp kdigit,x
+	beq mn_d
+	dex
+	bpl mn_dig
+	bmi mn_lp
+mn_d	inx			; test number X: its line, if it is on the tape
+	txa
+	ldx MNT
+mn_fd	dex
+	bmi mn_lp
+	cmp ttests,x
+	bne mn_fd
+	stx MSEL
+	jmp mgo
+mn_con	ldx #0			; any press ends the countdown
+	stx MIDLE
+	stx MIDLE+1
+	lsr
+	bcs mgo		; START
+	lsr
+	bcc mn_up
+	ldx MSEL		; SELECT: down, round to the top
+	inx
+	cpx MNT
+	beq mn_set
+	bcc mn_set
+	ldx #0
+	beq mn_set
+mn_up	ldx MSEL		; OPTION: up, round to the bottom
+	dex
+	bpl mn_set
+	ldx MNT
+mn_set	stx MSEL
+	jmp menu
+
+; mgo: run the highlighted line (the last one: the results).
+mgo	jsr waitrel
+	lda MSEL
+	cmp MNT
+	bcc mr_t
+	jmp final
+mr_t	asl
+	sta TIDX
+	jsr tnextv
+	jmp (NEXTVEC)
+
+; mdraw: the menu screen.
+mdraw	jsr scr_on
+	lda #<s_hmenu
+	ldy #>s_hmenu
+	jsr header
+	lda #2
+	jsr machinfo
+	ldx #0
+md_lp	stx CNT
+	lda #0			; the highlighted line in inverse
+	cpx MSEL
+	bne md_inv
+	lda #$80
+md_inv	sta INV
+	txa
+	clc
+	adc #4
+	ldx #0
+	jsr at
+	lda #0
+	jsr putc
+	ldx CNT
+	lda ttests,x
+	beq md_res
+	asl
+	tax
+	lda tnames-2,x
+	ldy tnames-1,x
+	jsr puts
+	lda CNT			; its state at column 20
+	clc
+	adc #4
+	ldx #20
+	jsr at
+	ldx CNT
+	ldy ttests,x
+	lda bitn-1,y
+	and MRUN
+	bne md_ran
+	lda #<s_notrun
+	ldy #>s_notrun
+	jsr puts
+	jmp md_nx
+md_ran	lda BADMASK,y
+	bne md_f
+	lda #<s_pass
+	ldy #>s_pass
+	jsr puts
+	jmp md_nx
+md_f	pha
+	lda #<s_fail
+	ldy #>s_fail
+	jsr puts
+	pla
+	jsr putitems
+md_nx	ldx CNT
+	inx
+	bne md_lp
+md_res	ldx CNT			; the last line: the results
+	stx MNT
+	lda #<s_mres
+	ldy #>s_mres
+	jsr puts
+	lda #0
+	sta INV
+	PRINT 18, 0, s_m1
+	PRINT 19, 0, s_m2
+	lda MIDLE
+	ora MIDLE+1
+	beq md_x
+	PRINT 21, 0, s_m3
+md_x	rts
+
+kdigit	.byte $1F, $1E, $1A, $18, $1D, $1B, $33	; KBCODEs of 1-7
+s_hmenu	dta d'MENU',$FF
+s_notrun dta d'-',$FF
+s_mres	dta d'RESULTS AND THE FINAL CODE',$FF
+s_m1	dta d'START=RUN  SELECT=DOWN  OPTION=UP',$FF
+s_m2	dta d'OR PRESS 1-7 TO RUN THAT TEST',$FF
+s_m3	dta d'NOTHING PRESSED FOR 10 S: RUN THEM ALL',$FF
+s_toggle3 dta d'START=MENU  SELECT=REPLAY  OPTION=FLASH',$FF
+	.endif
 
 ; results: every test on the tape, PASS or FAIL and its items, then the ROM
 ; names if test 1 ran.
@@ -280,6 +488,16 @@ rz_lp	stx CNT
 	jsr at
 	ldx CNT
 	ldy ttests,x
+	.ifdef MENU
+	lda bitn-1,y		; not run (from the menu)
+	and MRUN
+	bne rz_ran
+	lda #<s_notrun
+	ldy #>s_notrun
+	jsr puts
+	jmp rz_n
+rz_ran
+	.endif
 	lda BADMASK,y
 	bne rz_f
 	lda #<s_pass
@@ -302,7 +520,11 @@ rz_end	.ifdef WANT_ROM
 	jsr rominfo
 	.endif
 	PRINT 18, 0, s_items2
+	.ifdef MENU
+	PRINT 23, 0, s_toggle3	; START: back to the menu
+	.else
 	PRINT 23, 0, s_toggle2
+	.endif
 	rts
 
 ; clrrow: blank row A.

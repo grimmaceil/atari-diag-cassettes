@@ -1,6 +1,8 @@
 # Build intermediates; only the release tapes are kept.
 build/*
 !build/diag-400-0*.cas
+!build/diag-16k-0*.cas
+!build/diag-48k-0*.cas
 !build/diag-burnin.cas
 build/*FAULT*
 

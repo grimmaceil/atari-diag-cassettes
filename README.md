@@ -6,19 +6,37 @@ useful before the video works. A text screen comes in only once the display
 hardware checks out.
 
 There are three sets, one per RAM size, so a tape never needs more RAM than
-the machine has: `diag-400-*` for an 8K 400, and `diag-16k-*` and `diag-48k-*`
-(still to come: they will load in fewer steps). The tapes run in order. Each
-one relies only on what the earlier ones proved; for example, the keyboard is
-tested before any tape asks a Y/N question.
+the machine has, and bigger machines load in fewer steps:
+
+| Set | For | Tapes |
+|---|---|---|
+| `diag-400-*` | 8K 400 | 01 RAM, then four small tapes that each fit 8K by themselves: 02 ROMs, 03 input, 04 ports, 05 sound and video |
+| `diag-16k-*` | 16K-32K 400/800 | 01 RAM, 02 system: all seven tests in one load, with a menu |
+| `diag-48k-*` | 48K 800, XL/XE | as 16k. This set is where the RAM-hungry graphics and sound tests will go. |
+| `diag-burnin` | all | one version |
+
+The tapes of a set run in order. Each one relies only on what the earlier
+ones proved; for example, the keyboard is tested before any test asks a Y/N
+question.
+
+The system tape's menu (16k/48k):
+- START runs the highlighted test, SELECT moves down, OPTION moves up, and the
+  keys 1-7 run that test.
+- After a test the menu comes back with the next test highlighted, so
+  pressing START again and again walks through them.
+- Left alone for 10 s at power-on, it runs them all in order, then shows the
+  results and plays the final code.
+
+The 400 set, tape by tape:
 
 | Tape | File | What it does |
 |---|---|---|
-| 1 | `diag-400-01-ram.cas` | Low RAM, then the main RAM banks with March C- and address-in-address tests. On 16K and up a second stage also tests the RAM the first stage sat in, the RAM under the XL/XE OS ROM, and the 130XE's four extended banks. |
-| 2 | `diag-400-02-rom.cas` | Test 1: the OS chips, BASIC or a cartridge, and the font, identified by CRC32 against published tables (per chip on the 400/800, so a repaired board with mixed revisions shows up). |
-| 3 | `diag-400-03-input.cas` | Test 2: the keyboard, a map with three key states (not pressed, done, held), told apart by brightness. Test 3: the console keys and speaker. |
+| 1 | `diag-400-01-ram.cas` | Low RAM, then the main RAM banks with March C- and address-in-address tests. On 16K and up, a second stage also tests the RAM the first stage sat in, the RAM under the XL/XE OS ROM, and the 130XE's four extended banks. Every set has this tape. |
+| 2 | `diag-400-02-rom.cas` | Test 1: the OS chips, BASIC or a cartridge, and the font, identified by CRC32 against published tables. On the 400/800 each chip is named, so a repaired board with mixed revisions shows up. |
+| 3 | `diag-400-03-input.cas` | Test 2: the keyboard, as a map with three key states (not pressed, done, held) told apart by brightness. Test 3: the console keys and speaker. |
 | 4 | `diag-400-04-ports.cas` | Test 5: joysticks, live, on all four ports. Test 6: paddles, with an open-input check, then value, min/max, jitter and trigger. |
 | 5 | `diag-400-05-av.cas` | Test 4: the POKEY timer, RANDOM and the four voices by ear. Test 7: GTIA luminance and hue ramps. |
-| - | `diag-burnin.cas` | One version for every machine. It loops the RAM tests until a key is pressed, keeping a clock, a pass count and a log of the first and last failure for each bit, and flags intermittent faults. |
+| - | `diag-burnin.cas` | Every machine. It loops the RAM tests until a key is pressed, with a clock, a pass count and a log of the first and last failure for each bit, and flags intermittent faults. |
 
 A test's number (and so its beep code) is the same on every tape.
 
@@ -66,8 +84,8 @@ and tests it on hardware.
 
 ## Status
 
-The RAM tape and the burn-in have been run on a MiSTer Atari800 core. Tapes
-2-5 of the 400 set have only been run in the simulator so far.
+The RAM tape and the burn-in have been run on a MiSTer Atari800 core. The
+other tapes have only been run in the simulator so far.
 
 Issues and pull requests are the way to reach the author; email is not
 checked.

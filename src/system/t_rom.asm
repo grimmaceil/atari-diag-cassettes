@@ -23,7 +23,8 @@ OSCRC	= T3D+$03		; 3 x 4: 400/800 chips $D800, $E000, $F000;
 BASCRC	= T3D+$0F		; 4
 OSID	= T3D+$13		; 3: name number of each OSCRC ($FF: unknown)
 BASID	= T3D+$16
-ROMHAVE	= T3D+$17		; bit 1: BASIC/cartridge read, bit 2: halves read
+ROMHAVE	= T3D+$17		; bit 1: BASIC/cartridge read, bit 2: halves read,
+				; bit 3: it is a cartridge
 CRCSV	= TSCR+$00		; 16: the first read, for the re-read to match
 PGLEFT	= TSCR+$10		; crcpg: pages to go
 RTAB	= TSCR+$11		; crcid: the table's entries left
@@ -254,8 +255,19 @@ br_cmp	lda $A000,x
 	bne br_rom
 	dex
 	bpl br_cmp
+	lda $A000		; the same both ways: RAM (a 1200XL), or a
+	eor #$FF		; cartridge, which holds $A000-$BFFF either way
+	sta $A000		; and doesn't take a write
+	cmp $A000
+	php
+	eor #$FF
+	sta $A000		; (RAM: put it back)
+	plp
 	clc
-	bcc br_out
+	beq br_out
+	lda #8
+	ora ROMHAVE
+	sta ROMHAVE
 br_rom	jsr br_crc
 	sec
 br_out	lda PBSAVE		; (keeps C)
@@ -267,6 +279,9 @@ br_cart	lda RAMTOP		; RAM up to $BFFF: no cartridge
 	lda #$A0		; and the bus floats if nothing is plugged in
 	jsr varied
 	bcc br_no
+	lda #8
+	ora ROMHAVE
+	sta ROMHAVE
 	jsr br_crc
 	sec
 	rts
@@ -437,8 +452,9 @@ ri_bas	lda ROMHAVE
 	and #2
 	beq ri_ch
 	ldx #3			; BASCRC is OSCRC+12 and BASID is OSID+3: slot 3
-	lda MACHINE
-	bne ri_b
+	lda ROMHAVE
+	and #8
+	beq ri_b
 	lda #<s_rcart
 	ldy #>s_rcart
 	bne ri_bp

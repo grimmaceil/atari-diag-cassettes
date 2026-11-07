@@ -352,11 +352,19 @@ class Auto:
     PROMPTS = ['PRESS EVERY KEY', 'PRESS START, SELECT AND OPTION', 'HEARD IT?',
                'MOVE EACH STICK', 'UNPLUG ALL PADDLES', 'TURN EACH', 'RAMPS RIGHT?']
 
-    def __init__(self, hw, deny, skip):
+    def __init__(self, hw, deny, skip, menuwalk=False):
         self.hw, self.deny, self.skip, self.seen = hw, deny, skip, set()
+        self.menuwalk = menuwalk
 
     def check(self):
         text = self.hw.screen()
+        if self.menuwalk and 'SELECT=DOWN' in text:    # the 16k/48k menu: START
+            sel = [l for l in text.splitlines() if any(c.islower() for c in l[3:])]
+            sig = 'MENU|' + '|'.join(sel)              # runs the highlighted test
+            if sig not in self.seen:
+                self.seen.add(sig)
+                self.hw.press(self.hw.line + int(1000 * LINES_PER_MS), 'CON', 1)
+            return
         if 'START=GO ON' in text:    # a failed test's code: go on (a press only
             ln = self.hw.line        # counts in a pause, so keep pressing)
             if not any(e > ln for st, e, k, v in self.hw.presses if k == 'CON'):
@@ -365,8 +373,9 @@ class Auto:
         for p in self.PROMPTS:
             if p not in text:
                 continue
-            sig = p + '|' + '|'.join(l for l in text.splitlines() if 'VOICE' in l
-                                     or 'TEST' in l or 'TAPE' in l)
+            lines = text.splitlines()         # the header names the test; a
+            sig = p + '|' + lines[0] + '|' + '|'.join(  # result line is no new prompt
+                l for l in lines if 'VOICE' in l)
             if sig in self.seen:
                 continue
             self.seen.add(sig)
@@ -461,6 +470,9 @@ def main():
     ap.add_argument('--until', type=float, help='stop at this simulated time (s)')
     ap.add_argument('--deny', default='', help='with --auto: answer No where the screen shows these (comma list)')
     ap.add_argument('--skip', type=int, default=0, help='with --auto: leave this many keys unpressed')
+    ap.add_argument('--menuwalk', action='store_true',
+                    help='with --auto: press START at each menu (one test at a time)')
+    ap.add_argument('--peek', help='LO-HI: print these BSS bytes (hex offsets) at the end')
     ap.add_argument('--forge', help='ADDR=CRC32,...: stand-in 400/800 OS chips with these CRCs')
     ap.add_argument('-v', action='store_true')
     a = ap.parse_args()
@@ -514,7 +526,7 @@ def main():
     entered = set()
     insert_at = to_line(a.insert[0]) if a.insert else None
     frame = 0
-    auto = Auto(hw, [d for d in a.deny.split(',') if d], a.skip) if a.auto else None
+    auto = Auto(hw, [d for d in a.deny.split(',') if d], a.skip, a.menuwalk) if a.auto else None
     next_auto = 0
     while True:
         if auto and hw.line >= next_auto:
@@ -570,6 +582,9 @@ def main():
     print(f'first result at {t_done:.1f} s, {steps} steps, {hw.nmis} VBIs, '
           f'ended at {hw.line / LINES_PER_MS / 1000:.0f} s')
     print('--- final screen'); print(hw.screen())
+    if a.peek:                           # BSS offsets, e.g. E0-F3
+        lo, hi = (int(x, 16) for x in a.peek.split('-'))
+        print(f'BSS ${bss:04X} +{lo:02X}:', ' '.join(f'{hw.ram[bss + i]:02X}' for i in range(lo, hi + 1)))
     print('BADMASK[1..9]', ' '.join(f'${b:02X}' for b in bad[1:]),
           ' RAMTOP $%02X00' % hw.ram[bss + 0x12], ' NBANKS', hw.ram[bss + 0x11])
     for b in range(1, 10):
