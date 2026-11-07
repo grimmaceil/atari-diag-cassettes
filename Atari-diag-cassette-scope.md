@@ -265,6 +265,26 @@ self-test, which the CPU sees at $5000-$57FF when PORTB bit 7 = 0.
 | 59 | 45F47988 | MAME calls this "Rev. 3B ?" (Arabic 65XE) |
 | 59A | F0A236D3 | |
 
+XL/XE halves, each 8K. The $C000 half is $C000-$CFFF, then the self-test,
+then $D800-$DFFF; the $E000 half is $E000-$FFFF. The 1200XL values are from
+MAME (two chips). Revs 1-4 were split from Mike's ROM files (atari-os-romv33),
+whose whole-image CRCs match the table above.
+
+| Rev | $C000 half | $E000 half |
+|---|---|---|
+| 1 | C376D2F2 | 4502AF6F |
+| 2 | F1E30A44 | 397BAA67 |
+| 3 | 79E0D038 | 2C8B447A |
+| 4 | 4A3AE4E5 | ACCF9678 |
+| 10 (1200XL) | 0391386B | B502F1E7 |
+| 11 (1200XL) | 6E29EC8D | D73CE29A |
+
+Seen on Mike's MiSTer Atari800 core with its built-in ROMs (2026-11-07), and
+not in any table found (atari800, MAME, JAC!'s ROM Checker): OS whole
+72B08257, $C000 half 17640AF8, $E000 half 8B57241C, BASIC 5590539A, font sum
+$DD47. These are probably the core's built-in replacement OS and BASIC. The
+test reports them as UNKNOWN, which is correct.
+
 BASIC, 8K at $A000:
 
 | Rev | CRC32 | Notes |

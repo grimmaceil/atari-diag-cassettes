@@ -219,7 +219,7 @@ oi_x	rts
 
 ; mixed: item 5 if two known OS chips are from different revisions (the
 ; 400/800's $E000 and $F000 chips, or an XL/XE image made of two known
-; halves: only the 1200XL has two chips).
+; halves: two chips on a 1200XL, a damaged or patched image otherwise).
 mixed	ldx OSID+1
 	cpx #$FF
 	beq mx_x
@@ -556,16 +556,34 @@ tab_xl	.byte 11
 	.byte 13
 	.dword $F0A236D3
 	.byte 14
-tab_c0h	.byte 2
+; The halves: the 1200XL's two chips (MAME), and revs 1-4 split from ROM
+; files whose whole-image CRC matches the table above (section 10a).
+tab_c0h	.byte 6
 	.dword $0391386B
 	.byte 4
 	.dword $6E29EC8D
 	.byte 5
-tab_e0h	.byte 2
+	.dword $C376D2F2
+	.byte 6
+	.dword $F1E30A44
+	.byte 7
+	.dword $79E0D038
+	.byte 8
+	.dword $4A3AE4E5
+	.byte 11
+tab_e0h	.byte 6
 	.dword $B502F1E7
 	.byte 4
 	.dword $D73CE29A
 	.byte 5
+	.dword $4502AF6F
+	.byte 6
+	.dword $397BAA67
+	.byte 7
+	.dword $2C8B447A
+	.byte 8
+	.dword $ACCF9678
+	.byte 11
 tab_bas	.byte 4
 	.dword $4BEC4DE2
 	.byte 15

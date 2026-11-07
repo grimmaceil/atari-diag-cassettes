@@ -183,7 +183,7 @@ NPAT	= *-pats
 ; The header bar: " A8 DIAG 400 TAPE 3 " (SETNO 0 = 400, 1 = 16K), or the
 ; 48k tape's own name (SETNO 2).
 	.if SETNO=2
-s_hpre	dta d' A8 DIAG 48K XL/XE  ',$FF
+s_hpre	dta d' A8 DIAG 48K+ XL/XE ',$FF
 	.else
 s_hpre	dta d' A8 DIAG '
 	.if SETNO=0

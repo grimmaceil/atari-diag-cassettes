@@ -457,11 +457,11 @@ s_fail	dta d'FAIL'*,$FF
 s_bank4	dta d'BANK 4 $C000-$FFFF  IN STAGE 2',$FF
 s_result dta d'RESULT: ',$FF
 s_vnot	dta d'VIDEO NOT CONFIRMED',$FF
-s_toggle dta d'START=GO ON  SELECT=REPLAY  OPTION=FLASH',$FF
-s_toggle2 dta d'SELECT=REPLAY  OPTION=FULL-SCREEN FLASH',$FF
+s_toggle dta d'START=GO ON SELECT=RE-BEEP OPTION=FLASH',$FF
+s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
 s_l2load dta d'LOADING STAGE 2, KEEP TAPE PLAYING',$FF
 s_l2pre	dta d'STAGE 2: ',$FF
-s_l2_8k	dta d'NEEDS 16K, TAPE 1 ENDS HERE',$FF
+s_l2_8k	dta d'NEEDS 16K. NEXT: 400 TAPE 02',$FF
 s_l2_bad dta d'NOT LOADED, BANK 1 FAILED',$FF
 s_l2_big dta d'TOO BIG FOR THE GOOD RAM',$FF
 s_l2_sio dta d'ERROR $',$FF

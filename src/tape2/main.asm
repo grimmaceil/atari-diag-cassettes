@@ -679,9 +679,9 @@ s_more2	dta d' MORE',$FF
 s_result dta d'RESULT: ',$FF
 s_noerr	dta d'NO ERRORS',$FF
 s_nsol	dta d' SOLID, ',$FF
-s_nextok dta d'NEXT: TAPE 3',$FF
+s_nextok dta d'NEXT: TAPE 02 OF THE SET',$FF
 s_nextbad dta d'FIX SOLID ONES FIRST',$FF
-s_toggle2 dta d'SELECT=REPLAY  OPTION=FULL-SCREEN FLASH',$FF
+s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
 
 ; Pad to a whole page; the last two bytes hold the image sum (mkcas.py).
 PADTO	= [[*+2+$FF]/$100]*$100

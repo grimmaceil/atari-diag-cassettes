@@ -433,7 +433,7 @@ s_detail dta d'DETAIL:',$FF
 	.ifdef CHAIN3
 s_nextok dta d'ALL PASSED. THE LAST LINE: WHAT NEXT',$FF
 s_nextbad dta d'FIX THIS FIRST. THE LAST LINE: WHAT NEXT',$FF
-s_toggle dta d'START=GO ON  SELECT=REPLAY  OPTION=FLASH',$FF
+s_toggle dta d'START=GO ON SELECT=RE-BEEP OPTION=FLASH',$FF
 s_l2load dta d'LOADING THE SYSTEM TESTS, KEEP PLAYING',$FF
 s_l2pre	dta d'SYSTEM TESTS: ',$FF
 s_l2_8k	dta d'NEED 32K: USE THE 16K SET',$FF
@@ -443,10 +443,10 @@ s_l2_sio dta d'ERROR $',$FF
 s_l2_hdr dta d'NOT ON TAPE',$FF
 s_l2_sum dta d'BAD CHECKSUM',$FF
 	.else
-s_nextok dta d'ALL PASSED. NEXT: TAPE 2 (BURN-IN)',$FF
+s_nextok dta d'ALL PASSED. NEXT: TAPE 02 OF THE SET',$FF
 s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
 	.endif
-s_toggle2 dta d'SELECT=REPLAY  OPTION=FULL-SCREEN FLASH',$FF
+s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
 
 PADTO	= [[*+2+$FF]/$100]*$100
 	.if PADTO-*-2>0

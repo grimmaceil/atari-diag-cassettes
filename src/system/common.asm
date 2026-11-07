@@ -495,7 +495,7 @@ s_mall	dta d'ALL OF THEM, IN ORDER',$FF
 s_mres	dta d'RESULTS AND THE FINAL CODE',$FF
 s_m1	dta d'START=RUN  SELECT=DOWN  OPTION=UP',$FF
 s_m2	dta d'OR PRESS 1-7 TO RUN THAT TEST',$FF
-s_toggle3 dta d'START=MENU  SELECT=REPLAY  OPTION=FLASH',$FF
+s_toggle3 dta d'START=MENU  SELECT=RE-BEEP  OPTION=FLASH',$FF
 	.endif
 
 ; results: every test on the tape, PASS or FAIL and its items, then the ROM
@@ -633,8 +633,8 @@ s_pass	dta d'PASS',$FF
 s_fail	dta d'FAIL'*,$FF
 s_items	dta d', ITEMS',$FF
 s_tpass	dta d'NEXT TEST IN 2 S.  OPTION = FLASH      ',$FF
-s_toggle dta d'START=GO ON  SELECT=REPLAY  OPTION=FLASH',$FF
-s_toggle2 dta d'SELECT=REPLAY  OPTION=FULL-SCREEN FLASH',$FF
+s_toggle dta d'START=GO ON SELECT=RE-BEEP OPTION=FLASH',$FF
+s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
 s_items2 dta d'FAIL N: ITEM N. THE CODE IS TEST, ITEM.',$FF
 s_heard	dta d'HEARD IT? Y/START = YES, N/SELECT = NO',$FF
 s_hres	dta d'RESULTS',$FF
