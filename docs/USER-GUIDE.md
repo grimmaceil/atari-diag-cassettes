@@ -61,8 +61,7 @@ rising chirp: the machine is running the test.
 
 Put the `.cas` files on the MiSTer's storage (for example in
 `games/ATARI800/_diag`). Load the tape in the core's menu, then do the
-cassette boot above. In the core's settings you can pick which OS and
-BASIC ROMs it uses; see [ROMs on a MiSTer](#roms-on-a-mister).
+cassette boot above.
 
 ### From a PC: USB-SIO interface and AspeQt
 
@@ -194,14 +193,10 @@ machine with a lot of RAM this takes a few minutes.
 3. The overall result, and whether you confirmed the video.
 4. The keys (see [Keys during a result](#keys-during-a-result)).
 
-When a bank fails, its line shows the bad data bits:
-
-![RAM test failed](img/ram-05-fail.png)
-
-1. How to read the code.
-2. The failed bank and its bad bits. On an 800XL each data bit is one RAM
-   chip; see [When something fails](#when-something-fails).
-3. The overall result.
+When a bank fails, its line says FAIL and lists the bad data bits (for
+example `BITS D4`), and the border goes red while the code plays. On an
+800XL each data bit is one RAM chip; see
+[When something fails](#when-something-fails).
 
 **Summary** (machines with 16K or more). The second part of the tape tests
 the RAM the first part ran in, then on an XL/XE the RAM under the operating
@@ -234,9 +229,7 @@ On an XL/XE the OS is one 16K chip, named as a whole:
 ![ROMs on an XL](img/rom-02-xl.png)
 
 1. The OS. `UNKNOWN` (in inverse) means it matches no Atari ROM in the
-   table: a patched, replacement, failing or badly seated chip. On a MiSTer
-   it also means the core's own replacement ROMs; see
-   [ROMs on a MiSTer](#roms-on-a-mister).
+   table: a patched, replacement, failing or badly seated chip.
 2. BASIC, built into the XL/XE. A BASIC or cartridge the table doesn't know
    shows "NOT IN THE TABLE" and is not a fault.
 3. The character set's checksum.
@@ -431,16 +424,6 @@ inverted, held for two frames, checked, put back and checked again.
   first part of RAM, or the cassette or SIO connection.
 
 ## Questions
-
-### ROMs on a MiSTer
-
-The MiSTer core comes with its own built-in replacement ROMs. They are not
-Atari's, so the ROM test calls the OS `UNKNOWN`: that's correct, not a
-fault in the core. To test with real Atari code, load real OS and BASIC ROM
-files in the core's menu. A BASIC from a `.car` cartridge file must either
-be plugged in as a cartridge, or be converted to a plain 8K `.rom` file
-first. Loaded as a ROM with its cartridge header still in it, BASIC sits 16
-bytes out of place; the test spots this and shows `A, .CAR MISLOAD`.
 
 ### Why the different sets?
 
