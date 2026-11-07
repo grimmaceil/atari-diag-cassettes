@@ -449,7 +449,8 @@ class Auto:
     """Answers tape 3's prompts as a person would, from the screen text.
     deny: prompt words to answer No to; skip: keys to leave unpressed."""
     PROMPTS = ['PRESS EVERY KEY', 'PRESS START, SELECT AND OPTION', 'HEARD IT?',
-               'MOVE EACH STICK', 'UNPLUG ALL PADDLES', 'TURN EACH', 'RAMPS RIGHT?']
+               'MOVE EACH STICK', 'UNPLUG ALL PADDLES', 'TURN EACH', 'RAMPS RIGHT?',
+               'IN RAINBOW?']
 
     def __init__(self, hw, deny, skip, menuwalk=False, walk=None, skiponce=False):
         self.hw, self.deny, self.skip, self.seen = hw, deny, skip, set()
@@ -507,7 +508,7 @@ class Auto:
         else:
             yes = not any(d in text for d in self.deny)
             when = t + int(2.5 * 1000 * LINES_PER_MS)
-            if p in ('HEARD IT?', 'RAMPS RIGHT?'):
+            if p in ('HEARD IT?', 'RAMPS RIGHT?', 'IN RAINBOW?'):
                 hw.press(when, 'KB', 0x2B if yes else 0x23)
             else:
                 hw.press(when, 'CON', 1)        # START

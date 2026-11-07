@@ -10,6 +10,7 @@ TRIG0	= $D010		; joystick fire, 0 = pressed
 TRIG1	= $D011
 COLPF1	= $D017		; GRAPHICS 0 text luminance
 COLPF2	= $D018		; GRAPHICS 0 text background
+COLPF3	= $D019		; playfield 3; the fifth player's color (PRIOR bit 4)
 HPOSP0	= $D000		; P/M horizontal positions: P0-P3 $D000-3, M0-M3 $D004-7
 SIZEP0	= $D008		; player widths, P0-P3 (3 = quadruple)
 SIZEM	= $D00C		; missile widths, 2 bits each

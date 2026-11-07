@@ -313,7 +313,10 @@ over until you answer whether you heard it.
 2. The voice playing now.
 3. The question: Y or START = yes, N or SELECT = no.
 
-**GTIA.** Eight brightness steps and sixteen colours, drawn down the screen.
+**GTIA.** First, eight brightness steps and sixteen colours, drawn down the
+screen (item 1). Then the sprites (item 2): the word ATARI, made of the four
+players and the four missiles, scrolls across the screen in rainbow colours
+that move down the letters. Answer whether it looks right.
 
 ![GTIA ramps](img/av-02-gtia.png)
 
