@@ -1,0 +1,56 @@
+[
+ {
+  "name": "green",
+  "atari": "$C8",
+  "rgb": "#009B58",
+  "meaning": "alive; a pass"
+ },
+ {
+  "name": "green flash",
+  "atari": "$CC",
+  "rgb": "#4CE5AB",
+  "meaning": "a pass beep: the jingle, one long flash per bank or test"
+ },
+ {
+  "name": "red flash",
+  "atari": "$38",
+  "rgb": "#D15D57",
+  "meaning": "a fault beep: long = where, short = which bit or item"
+ },
+ {
+  "name": "yellow",
+  "atari": "$1C",
+  "rgb": "#F0C55A",
+  "meaning": "testing (a hang shows yellow); burn-in: an intermittent fault seen"
+ },
+ {
+  "name": "red",
+  "atari": "$34",
+  "rgb": "#891104",
+  "meaning": "a fault: the beep code follows"
+ },
+ {
+  "name": "purple",
+  "atari": "$56",
+  "rgb": "#AD3C9F",
+  "meaning": "waiting for you: a question, or the video check's last chance"
+ },
+ {
+  "name": "black",
+  "atari": "$00",
+  "rgb": "#000000",
+  "meaning": "the text background"
+ },
+ {
+  "name": "text",
+  "atari": "$0C",
+  "rgb": "#CBC3D0",
+  "meaning": "the text (luminance 12)"
+ },
+ {
+  "name": "done key",
+  "atari": "$C6",
+  "rgb": "#008039",
+  "meaning": "keyboard map: a key already pressed"
+ }
+]

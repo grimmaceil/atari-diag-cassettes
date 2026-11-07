@@ -15,7 +15,7 @@ KCACT	= TSCR+$0E		; nonzero: CONTROL shown held
 SHACT	= TSCR+$0F		; nonzero: SHIFT shown held
 BRKT	= TSCR+$10		; frames BREAK stays shown held (it has no key-up)
 LMODE	= TSCR+$11		; light: $80 held (inverse + P/M), 0 back to done
-LXS	= TSCR+$12		; light: caller's X
+LXS	= TSCR+$12		; light: caller's X; kbinv: its Y (+1)
 
 KBROW	= 8			; first row of the on-screen keyboard
 
@@ -158,7 +158,8 @@ kb_done
 
 	lda #0
 	sta IRQEN
-	jsr pmoff		; before the result: the flash screen has no PMs
+	jsr kbinv		; the pressed keys in inverse: the result screen
+	jsr pmoff		; has no P/M colors (nor do the flashes)
 	jsr waitrel
 	lda KBLEFT
 	beq kb_end
@@ -166,6 +167,59 @@ kb_done
 	ora BADMASK+2
 	sta BADMASK+2
 kb_end	jmp tend
+
+; kbinv: every key seen, inverse, and the legend to match, so the missing
+; ones stand out on the result screen.
+kbinv	lda DISPOK
+	beq ki_x
+	ldy #63
+ki_lp	tya			; KBCODE Y seen?
+	lsr
+	lsr
+	lsr
+	tax
+	tya
+	and #7
+	sta MTMP
+	lda KBSEEN,x
+	ldx MTMP
+ki_sh	dex
+	bmi ki_bit
+	lsr
+	bpl ki_sh		; (A shifts right: never negative after one)
+ki_bit	lsr
+	bcc ki_nx
+	lda kbofs,y
+	cmp #$FF
+	beq ki_nx
+	sty LXS+1		; (light keeps X, not Y)
+	jsr light
+	ldy LXS+1
+ki_nx	dey
+	bpl ki_lp
+	lda KBX			; SHIFT, CONTROL, BREAK
+	lsr
+	pha
+	bcc ki_c
+	lda #KO_SHIFT1
+	jsr light
+	lda #KO_SHIFT2
+	jsr light
+ki_c	pla
+	lsr
+	pha
+	bcc ki_b
+	lda #KO_CTRL
+	jsr light
+ki_b	pla
+	lsr
+	bcc ki_l
+	lda #KO_BREAK
+	jsr light
+ki_l	lda #KBROW+5
+	jsr clrrow
+	PRINT KBROW+5, 0, s_kb3
+ki_x	rts
 
 ; kbup: the key (and CONTROL) shown held goes back to done. Keeps X.
 kbup	lda KACT
@@ -405,6 +459,7 @@ kbrtab	.word kbrow0, kbrow1, kbrow2, kbrow3, kbrow4
 
 s_kb1	dta d'PRESS EVERY KEY. START ENDS THE TEST.',$FF
 s_kb2	dta d'NOT PRESSED YET  DONE  HELD',$FF
+s_kb3	dta d'INVERSE: PRESSED. NORMAL: NOT PRESSED',$FF
 KL_DONE	= 5*40+17		; legend words, as keyboard offsets
 KL_HELD	= 5*40+23
 s_stuck	dta d'A KEY WAS DOWN AT THE START: STUCK?'*,$FF

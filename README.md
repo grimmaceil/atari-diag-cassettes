@@ -1,115 +1,50 @@
 # A8 Cassette Diagnostics
 
-Bootable cassette diagnostics for Atari 8-bit computers (400, 800, XL, 130XE).
-Each tape reports with synchronized beeps and border flashes first, so it is
-useful before the video works. A text screen comes in only once the display
-hardware checks out.
+Diagnostic tapes for the Atari 400, 800, XL and XE computers. Load one like
+any cassette program and it tests the machine: RAM, ROMs, keyboard, console
+keys, joysticks, paddles, sound and video, plus a burn-in for faults that
+come and go.
 
-There are three sets, one per RAM size, so a tape never needs more RAM than
-the machine has, and bigger machines load in fewer steps. The 400 set is also
-the fallback for any machine: it needs only the first 8K to work.
+It reports by **border colour and beeps** first, so it works even when the
+picture doesn't. Text appears on screen once the screen itself has been
+checked.
 
-| Set | For | Tapes |
-|---|---|---|
-| `diag-400-*` | 8K 400 | 01 RAM, then four small tapes that each fit 8K by themselves: 02 ROMs, 03 input, 04 ports, 05 sound and video |
-| `diag-16k-*` | 16K-32K 400/800 | 01 RAM, 02 system: all seven tests in one load, with a menu |
-| `diag-48k-xl-xe` | 48K 800, XL/XE | one tape, one load: RAM, the rest of RAM (where the tape itself loaded, the RAM under the OS, the 130XE banks), then the system tests with the menu |
-| `diag-400-burnin`, `diag-burnin` | 8K / 16K and up | the burn-in; see below |
+![The menu](docs/img/system-01-menu.png)
 
-The 48k+ tape is a single boot file, loaded at $4000. It tests $0800-$3FFF
-and everything above itself, copies the rest of its code into the proven RAM
-at $0800, and from there tests the RAM it was loaded into. Then come the RAM
-under the OS, the 130XE banks and the system tests. A RAM fault plays its
-code; START then goes on, and the fault shows again as test 8 (item = bank)
-in the results and the final code. Use the 400 set instead if any of these
-happen:
-- bank 1 is bad
-- the tape won't load
-- one long beep and the end tone, with no picture: a bad image checksum, so
-  the RAM it loaded into ($4000-$84FF) is bad
-- no green chirp after the load: the RAM its first part runs in
-  ($4000-$51FF) is bad
+## Get started
 
-The tapes of a set run in order. Each one relies only on what the earlier
-ones proved; for example, the keyboard is tested before any test asks a Y/N
-question.
+1. Pick the tapes for your machine:
 
-The system tests' menu (16k, 48k):
-- START runs the highlighted line, SELECT moves down, OPTION moves up, and
-  the keys 1-7 run that test.
-- At power-on "ALL OF THEM, IN ORDER" is highlighted, so one START runs
-  everything, then shows the results and plays the final code.
-- After a single test the menu comes back with the next test highlighted, so
-  pressing START again and again walks through them.
+   | Your machine | Tapes (in `cassettes/`) |
+   |---|---|
+   | 400 with 8K | `diag-400-01-ram` to `diag-400-05-av`, then `diag-400-burnin` |
+   | 400/800 with 16K-32K | `diag-16k-01-ram`, `diag-16k-02-system`, `diag-burnin` |
+   | 800 with 48K, XL, XE | `diag-48k-xl-xe` (one tape), `diag-burnin` |
+   | anything that won't get through its own set | the 400 set |
 
-Past the first screen check nothing times out: every question waits for its
-answer. While a question waits the border is purple, and a sound being asked
-about (a POKEY voice, the console speaker) repeats until the answer, so the
-test still works when the picture doesn't. A test that ends with START
-(joysticks, paddles, console keys) also ends with any keyboard key, in case
-START is the broken part.
+2. Load the first tape: hold START (START and OPTION on an XL/XE), switch
+   the machine on, start the tape and press a key when it beeps. You can
+   use a MiSTer, a PC with a USB-SIO cable and AspeQt, or a real cassette.
+3. Watch and listen: green is good, red plus beeps is a fault. Long beeps
+   say where (RAM bank or test number), short beeps say what (data bit or
+   item).
 
-The 400 set, tape by tape:
+**[The user guide](docs/USER-GUIDE.md)** explains every screen, the colours
+and beeps, loading from a PC, and what to do when something fails.
 
-| Tape | File | What it does |
-|---|---|---|
-| 1 | `diag-400-01-ram.cas` | Low RAM, then the main RAM banks with March C- and address-in-address tests. On 16K and up, a second stage also tests the RAM the first stage sat in, the RAM under the XL/XE OS ROM, and the 130XE's four extended banks. Every set has this tape. |
-| 2 | `diag-400-02-rom.cas` | Test 1: the OS chips, BASIC or a cartridge, and the font, identified by CRC32 against published tables. On the 400/800 each chip is named, so a repaired board with mixed revisions shows up. |
-| 3 | `diag-400-03-input.cas` | Test 2: the keyboard, as a map with three key states (not pressed, done, held) told apart by brightness. Test 3: the console keys and speaker. |
-| 4 | `diag-400-04-ports.cas` | Test 5: joysticks, live, on all four ports. Test 6: paddles, with an open-input check, then value, min/max, jitter and trigger. |
-| 5 | `diag-400-05-av.cas` | Test 4: the POKEY timer, RANDOM and the four voices by ear. Test 7: GTIA luminance and hue ramps. |
-| - | `diag-400-burnin.cas` | The burn-in for an 8K 400 (it runs on more, but `diag-burnin` is better there). It loops the RAM tests until a key is pressed, with a clock, a pass count and a log of each bad bit (first pass seen, passes failed), and flags intermittent faults. It also checks its own RAM on every pass. The program's checksum must not change. Each page of the program is then saved in the screen, given the full march and an address test, put back and read back. The screen itself takes a NOT test (invert, read back, restore, read back). Interrupts are off for all of this, and faults there log as bank 9. |
+## For developers
 
-`diag-burnin.cas` is the burn-in for 16K and up. From about 20K (32K, 48K, XL/XE), it keeps two copies of itself and swaps between them every pass. It writes the other copy through a relocation bitmap and reads it back before switching, so each copy tests the other's RAM with the full march and address tests. One counted pass is both halves, so every byte from $0800 up, its own code and screen included, is fully tested on every pass. On the XL/XE the second copy sits at $8000, out of the 130XE's banking window. On 16K it has no room for a second copy, so it uses the 8K burn-in's page test instead.
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) covers building from source, the
+simulator, the source layout and the attributions. The design notes are in
+[Atari-diag-cassette-scope.md](Atari-diag-cassette-scope.md).
 
-A test's number (and so its beep code) is the same on every tape.
-
-The `-part2.cas` files hold stage 2 alone. Use them if your tape player or
-emulator doesn't stop between stages.
-
-Booting: hold START at power-on (START+OPTION on an XL to leave BASIC out),
-wait for the beep, start the tape and press a key. The design, the beep and
-flash code, and the open items are in
-[`Atari-diag-cassette-scope.md`](Atari-diag-cassette-scope.md).
-
-## Reading the beeps
-
-- **Pass:** a green border and a short jingle, then one flash for each bank
-  (or test) that passed.
-- **Fail:** a red border. The long beeps give the bank (or test) number, the
-  short beeps give the bit (or item), and a low tone ends each fault.
-- **During a result:** START goes on, SELECT replays the code, and OPTION
-  switches between the text screen and full-screen flashes.
-
-## Building
-
-You need Python 3 and the [MADS](https://github.com/tebe6502/Mad-Assembler)
-assembler. Put `mads.exe` in `tools/bin/` (built and tested with MADS 2.1.9
-on Windows).
-
-```
-python tools/build.py              # all tapes into build/
-python tools/build.py --fault 2,5  # tape 1 with a stuck bit 5 in bank 2, to hear a fail code
-python tools/sim.py build/03-system.cas --auto --until 400   # run a tape in the simulator
-```
-
-`tools/sim.py` is a cycle-timed 6502 simulator for the tapes; it uses
-[py65](https://github.com/mnaberez/py65) (`pip install py65`). It models the
-cassette boot, SIO stage loads, RAM faults (stuck bits, flaky bits, mirrors),
-XL/XE banking, keys and joysticks. It prints the screen and decodes the beep
-code. `tools/gen_kbmap.py` regenerates the tape 3 keyboard map.
-
-## Authorship
+## Authorship and status
 
 The author has programmed 6502 machine language and assembler since
 childhood. Even so, all of the code and documents here are, for now, 100%
-written by AI (Claude, by Anthropic). The author directs the work, reviews it
-and tests it on hardware.
+written by AI (Claude, by Anthropic). The author directs the work, reviews
+it and tests it on hardware.
 
-## Status
-
-The RAM tape and the burn-in have been run on a MiSTer Atari800 core. The
-other tapes have only been run in the simulator so far.
-
-Issues and pull requests are the way to reach the author; email is not
-checked.
+Version 0.1. Tested on a MiSTer Atari800 core and in the project's
+simulator; not yet on a real 400, 800, XL or XE. Issues and pull requests
+are the way to reach the author; email is not checked.

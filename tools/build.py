@@ -17,8 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MADS = ROOT / 'tools' / 'bin' / 'mads.exe'
-BUILD = ROOT / 'build'
-SHARE = Path('//TRUENAS/Media/games/ATARI800')   # MiSTer Atari800 core's folder
+BUILD = ROOT / 'build'          # everything the assembler makes (not in git)
+CASSETTES = ROOT / 'cassettes'  # the release tapes (in git): what users load
+SHARE = Path('//TRUENAS/Media/games/ATARI800/_diag')   # the tapes, in the MiSTer Atari800 core's folder
 
 # Each tape: source dir, name, stages (first = boot), defines. A later stage
 # is told where the boot stage keeps its BSS and where its own test area ends.
@@ -193,6 +194,10 @@ def main():
                 tag += f'-e{every[0]}'
             cas += build(src, f'{name}-FAULT-{tag}', stages, fd,
                          f'A8 {name.upper()} FAULT {tag}')
+    CASSETTES.mkdir(exist_ok=True)
+    for c in cas:
+        if 'FAULT' not in c.name:       # fault-injection builds stay in build/
+            shutil.copy2(c, CASSETTES / c.name)
     if a.deploy:
         for c in cas:
             shutil.copy2(c, SHARE / c.name)

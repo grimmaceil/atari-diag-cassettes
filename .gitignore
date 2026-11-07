@@ -1,14 +1,11 @@
-# Build intermediates; only the release tapes are kept.
-build/*
-!build/diag-400-0*.cas
-!build/diag-16k-0*.cas
-!build/diag-48k-xl-xe*.cas
-!build/diag-burnin.cas
-!build/diag-400-burnin.cas
-build/*FAULT*
+# Everything the assembler makes; the release tapes go to cassettes/.
+build/
 
-# The assembler is fetched separately (see README).
+# The assembler is fetched separately (see docs/DEVELOPMENT.md).
 tools/bin/
 
 __pycache__/
 *.pyc
+
+# Screenshots before their callouts (tools/docshots.py makes both).
+docs/img/raw/

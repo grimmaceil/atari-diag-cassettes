@@ -208,7 +208,7 @@ NREC	= [IMGEND-LOAD]/128
 BSS	= IMGEND
 TSTART	= [>BSS]+1
 	.ifdef SYSLOAD
-	.if [>BSS]+1>$3C
-	.error "system tests too big for the one-load payload (BSS must end below $3C00)"
-	.endif
+	.if [>BSS]+1>$3F		; stage 1's BSS page is $3F00 (the one-load
+	.error "system tests too big for the one-load payload (BSS must end below $3F00)"
+	.endif				; screen is never at $3C00, see display.asm)
 	.endif

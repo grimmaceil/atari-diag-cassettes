@@ -13,9 +13,11 @@
 ;     its own operands as it runs, the same way every pass). Then each page
 ;     from $0800 up to TSTART is saved in the screen block, given March C-
 ;     ($00/$FF and $55/$AA) and an address-in-page test, put back and read
-;     back: the full patterns, and the code survives. The screen block
-;     takes a NOT test (invert, read back, put back, read back), and with
-;     no display (no tested buffer) so does this stage's RAM. These tests
+;     back: the full patterns, and the code survives. With no display (no
+;     tested buffer) this stage's RAM takes a NOT test instead (invert,
+;     read back, put back, read back). Then the screen block: a visible
+;     sweep, an inverse bar down the screen (see sweep), every pass, in
+;     every burn-in build. These tests
 ;     run from copies in low RAM ($0400-$04FF), written with branches and
 ;     (zp),y only so they run from anywhere and never test themselves; the
 ;     VBI and ANTIC are off. Faults go in the log as bank 9 ("B9", this
@@ -238,6 +240,7 @@ ps_lr	jsr tick
 	bne ps_lr
 	.ifdef OWNTEST
 	jsr owntest
+	jsr sweep
 	.endif
 	lda #$40
 	sta NMIEN
@@ -1001,9 +1004,8 @@ ot_cmp	lda SUM			; changed: the bits that differ, as a hint
 	eor REFSUM+1
 	ora NTERR
 	sta NTERR
-	lda #0
-	sta DMACTL
-	sta NTPTR
+	lda #0			; (the display stays on: the top rows show the
+	sta NTPTR		; save page at work)
 	sta BUFP
 	lda #>LOAD
 	sta NTPTR+1
@@ -1019,10 +1021,6 @@ ot_pg	jsr PGCODE
 	inc NTPTR+1
 	dex
 	bne ot_pg
-	lda SCRPG		; then the screen block, NOT test
-	sta NTPTR+1
-	ldx #4
-	jsr NTCODE
 	lda SCRON		; the screen back: it was the save page
 	beq ot_nt
 	jsr scr_on
@@ -1037,6 +1035,94 @@ ot_t	jsr tick
 	dex
 	bne ot_t
 	rts
+
+; sweep: the screen block, with the display on so the test can be seen.
+; Row by row: the row saved in ROWBUF, inverted (read back), held inverted
+; two frames, read again (bits that didn't hold), put back (read back): an
+; inverse bar runs down the screen. Then the display list, NOT-tested in
+; the vertical blank, while ANTIC isn't reading it. Called with the VBI off:
+; it counts its own frames on the clock.
+ROWBUF	= PICBASE+$C8		; 40 bytes, after the page and NOT tests
+sweep	lda DISPOK
+	beq sw_no
+	lda SCRON
+	bne sw_go
+sw_no	rts
+sw_go	lda #0
+	sta NTERR
+	sta NTPTR
+	lda SCRPG
+	sta NTPTR+1
+	ldx #24
+sw_row	ldy #39
+sw_inv	lda (NTPTR),y		; save, invert, read back
+	sta ROWBUF,y
+	eor #$FF
+	sta (NTPTR),y
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	dey
+	bpl sw_inv
+	jsr swframe
+	jsr swframe
+	ldy #39
+sw_bk	lda ROWBUF,y		; still inverted? then back, read back
+	eor #$FF
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	lda ROWBUF,y
+	sta (NTPTR),y
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	dey
+	bpl sw_bk
+	lda NTPTR		; the next row
+	clc
+	adc #40
+	sta NTPTR
+	bcc sw_nc
+	inc NTPTR+1
+sw_nc	dex
+	bne sw_row
+sw_vb	lda VCOUNT		; the display list, $3C0-$3FF: in the blank
+	cmp #124
+	bcc sw_vb
+	lda #0			; (the rows left NTPTR at +$3C0)
+	sta NTPTR
+	lda SCRPG
+	clc
+	adc #3
+	sta NTPTR+1
+	ldy #$C0
+sw_dl	lda (NTPTR),y
+	sta NTSAV
+	eor #$FF
+	sta (NTPTR),y
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	lda NTSAV
+	sta (NTPTR),y
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	iny
+	bne sw_dl
+	lda NTERR
+	ora BADMASK+LDRIDX
+	sta BADMASK+LDRIDX
+sw_x	rts
+; swframe: wait for the next frame, and count it (the VBI is off).
+swframe	lda VCOUNT
+	cmp #124
+	bcc swframe
+sf_2	lda VCOUNT
+	cmp #124
+	bcs sf_2
+	jmp tick
 
 ; The page test, copied to PGCODE and written to run from anywhere:
 ; branches and (zp),y only. The page at NTPTR: saved at BUFP, March C- with
@@ -1156,8 +1242,8 @@ nt_lp	lda (NTPTR),y
 	bne nt_lp
 	rts
 PICLEN	= *-pgsrc
-	.if PICLEN>256
-	.error "page and NOT tests must fit $0400-$04FF"
+	.if PICLEN>$C8
+	.error "page and NOT tests must end below ROWBUF ($04C8)"
 	.endif
 	.endif
 

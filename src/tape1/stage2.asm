@@ -425,7 +425,11 @@ puts_st	pha
 	icl '../common/xlram.asm'
 
 s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF
+	.ifdef ONELOAD
+s_hrel	dta d'IMAGE AREA',$FF
+	.else
 s_hrel	dta d'LOADER AREA',$FF
+	.endif
 s_hsum	dta d'SUMMARY',$FF
 	.ifdef ONELOAD
 s_tldr	dta d'TESTING THE IMAGE AREA $3F00-$',$FF

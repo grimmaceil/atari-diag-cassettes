@@ -31,26 +31,25 @@ gt_v	pha
 	pla
 	jsr puts
 gt_g	jsr waitrel
-gt_lp	lda VCOUNT		; luminance: 8 steps of 8 lines
-	cmp #[32+GL_ROW*8]/2
-	bne gt_lp
+gt_lp	lda VCOUNT		; luminance: 8 steps of 7 lines, rows 5-11 (8 of 8
+	cmp #[32+GL_ROW*8]/2-1	; ran into row 12's label). VCOUNT counts line
+	bne gt_lp		; pairs: start a pair early, end inside row 11
 	ldx #0
 gt_l	txa
 	asl
 	sta WSYNC
 	sta COLPF2
-	ldy #7
+	ldy #6
 gt_l1	sta WSYNC
 	dey
 	bne gt_l1
 	inx
 	cpx #8
 	bne gt_l
-	sta WSYNC
-	lda #C_TEXTBG
+	lda #C_TEXTBG		; (in the horizontal blank after the last WSYNC)
 	sta COLPF2
-gt_w	lda VCOUNT		; hue: 16 steps of 4 lines
-	cmp #[32+GH_ROW*8]/2
+gt_w	lda VCOUNT		; hue: 16 steps of 4 lines, rows 13-20
+	cmp #[32+GH_ROW*8]/2-1
 	bne gt_w
 	ldx #0
 gt_h	txa
@@ -68,7 +67,6 @@ gt_h1	sta WSYNC
 	inx
 	cpx #16
 	bne gt_h
-	sta WSYNC
 	lda #C_TEXTBG
 	sta COLPF2
 	lda SKSTAT		; the answer, polled once a frame

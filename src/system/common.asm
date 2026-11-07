@@ -396,9 +396,20 @@ mgo	jsr waitrel
 	bcc mr_t
 	beq mr_all
 	jmp final
-mr_all	inc MMODE		; all, from the first
+mr_all	inc MMODE		; all, from the first: every result starts clean
+	ldx #7			; (not test 8, the RAM stages' result)
 	lda #0
-mr_t	asl
+	sta MRUN
+ma_cl	sta BADMASK,x
+	dex
+	bne ma_cl
+	beq mr_go
+mr_t	tax			; one test: its old result goes (a run after a
+	ldy ttests,x		; fail must be able to pass)
+	lda #0
+	sta BADMASK,y
+	txa
+mr_go	asl
 	sta TIDX
 	jsr tnextv
 	jmp (NEXTVEC)

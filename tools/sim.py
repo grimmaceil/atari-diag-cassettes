@@ -13,6 +13,7 @@ Real hardware faults can be simulated, independent of the FAULT build flag:
   --mirror                 bank 3 aliases bank 2 (a missing address line)
 """
 import argparse
+from pathlib import Path
 import os
 import random
 import sys
@@ -49,6 +50,8 @@ class Atari:
         self.events = []         # (line, reg, value)
         self.regs = {}
         self.romover = {}       # --forge: stand-in ROM bytes replaced
+        self.osrom = None        # --osrom: a real OS image (10K or 16K)
+        self.basic = None        # --basic: a real 8K BASIC (or cartridge)
         self.pm = {}            # GRACTL, PMBASE: for the P/M color mask in screen()
 
     def active(self, kind):
@@ -127,8 +130,17 @@ class Atari:
             if self.xl or a >= 0xD800:
                 if a in self.romover:
                     return self.romover[a]
+                if self.osrom is not None:
+                    return self.osrom[a - (0xC000 if len(self.osrom) == 0x4000 else 0xD800)]
                 return ((a * 31) ^ (a >> 3)) & 0xFF    # stand-in ROM bytes
             return a >> 8        # 400/800: nothing at $C000-$CFFF
+        pb = self.regs.get(0xD301, 0xFF)
+        if (self.xl and self.osrom is not None and len(self.osrom) == 0x4000
+                and 0x5000 <= a < 0x5800 and pb & 0x81 == 0x01):
+            return self.osrom[a - 0x4000]   # the self-test ROM (PORTB bit 7 = 0)
+        if self.basic is not None and 0xA000 <= a < 0xC000 and (
+                not self.xl or not pb & 0x02):
+            return self.basic[a - 0xA000]   # BASIC (XL/XE: PORTB bit 1 = 0) or a cartridge
         if self.ramtop <= a < 0xC000:
             return a >> 8        # floating bus
         x = self._ext(a)
@@ -156,7 +168,8 @@ class Atari:
             if a == 0xD40A:
                 self.mpu.processorCycles = (self.line + 1) * 114
             elif a in (0xD01A, 0xD200, 0xD201, 0xD01F, 0xD40E, 0xD400,
-                       0xD402, 0xD403, 0xD302, 0xD301):
+                       0xD402, 0xD403, 0xD302, 0xD301, 0xD017, 0xD018,
+                       0xD012, 0xD013, 0xD014, 0xD015, 0xD401, 0xD409):
                 if self.regs.get(a) != v:
                     self.events.append((self.line, a, v))
                 self.regs[a] = v
@@ -187,6 +200,83 @@ class Atari:
 
     def __len__(self):
         return 0x10000
+
+    def render(self, path, palette, font, scale=2):
+        """The last whole frame as a PNG: border (COLBK), the GRAPHICS 0 text
+        (COLPF2 background, COLPF1 luminance), inverse video, the P/M color
+        mask, and every color as it was on each scan line (WSYNC color bars
+        and ramps too). palette: 768 bytes of RGB; font: the 1K ROM font."""
+        from PIL import Image
+        fl = self.frame_lines
+        f0 = (self.line // fl - 1) * fl          # the last complete frame
+        regs = (0xD01A, 0xD017, 0xD018, 0xD012, 0xD013, 0xD014, 0xD015, 0xD401, 0xD400)
+        cur = {r: 0 for r in regs}
+        per = []                                   # register values per scan line
+        ev = sorted((e for e in self.events if e[1] in regs), key=lambda e: e[0])
+        k = 0
+        for ln in range(f0, f0 + 248):
+            while k < len(ev) and ev[k][0] <= ln:
+                cur[ev[k][1]] = ev[k][2]
+                k += 1
+            per.append(dict(cur))
+        rgb = lambda c: tuple(palette[(c & 0xFE) * 3:(c & 0xFE) * 3 + 3])
+        W, H = 384, 240                            # scan lines 8-247, 32 px border
+        img = Image.new('RGB', (W, H))
+        px = img.load()
+        rows = {}                                  # scan line -> (text address, row in char)
+        if per[-1][0xD400] & 0x20 or any(p[0xD400] & 0x20 for p in per):
+            dl = self.regs.get(0xD402, 0) | self.regs.get(0xD403, 0) << 8
+            addr, scan = 0, 8
+            for _ in range(64):
+                op = self.ram[dl]
+                if op == 0x41:
+                    break
+                if op & 0x0F == 0:
+                    dl += 1
+                    scan += (op >> 4 & 7) + 1
+                    continue
+                if op & 0x40:
+                    addr = self.ram[dl + 1] | self.ram[dl + 2] << 8
+                    dl += 3
+                else:
+                    dl += 1
+                for r in range(8):
+                    rows[scan + r] = (addr, r)
+                addr += 40
+                scan += 8
+        pmb = self.pm.get(0xD407, 0) << 8 if self.pm.get(0xD01D, 0) == 3 else None
+        for y in range(H):
+            sl = y + 8
+            p = per[sl]
+            bk = rgb(p[0xD01A])
+            for x in range(W):
+                px[x, y] = bk
+            if sl not in rows or not p[0xD400] & 0x20:
+                continue
+            addr, r = rows[sl]
+            pf1, pf2 = p[0xD017], p[0xD018]
+            for c in range(40):
+                code = self.ram[(addr + c) & 0xFFFF]
+                bits = font[(code & 0x7F) * 8 + r]
+                if code & 0x80 and p[0xD401] & 2:
+                    bits ^= 0xFF
+                bg = pf2
+                if pmb is not None:
+                    yb = sl // 2
+                    if c < 32:
+                        on = self.ram[pmb + 0x200 + (c >> 3) * 0x80 + yb] & 0x80 >> (c & 7)
+                        n = c >> 3
+                    else:
+                        m = c - 32
+                        on = self.ram[pmb + 0x180 + yb] & 1 << (2 * (m >> 1) + 1 - (m & 1))
+                        n = m >> 1
+                    if on:
+                        bg = p[0xD012 + n]
+                fg = (bg & 0xF0) | (pf1 & 0x0E)
+                cb, cf = rgb(bg), rgb(fg)
+                for b in range(8):
+                    px[32 + c * 8 + b, y] = cf if bits & 0x80 >> b else cb
+        img.resize((W * scale, H * scale), Image.NEAREST).save(path)
 
     def screen(self):
         """The GRAPHICS 0 screen as text (inverse letters shown lowercase)."""
@@ -361,9 +451,11 @@ class Auto:
     PROMPTS = ['PRESS EVERY KEY', 'PRESS START, SELECT AND OPTION', 'HEARD IT?',
                'MOVE EACH STICK', 'UNPLUG ALL PADDLES', 'TURN EACH', 'RAMPS RIGHT?']
 
-    def __init__(self, hw, deny, skip, menuwalk=False):
+    def __init__(self, hw, deny, skip, menuwalk=False, walk=None, skiponce=False):
         self.hw, self.deny, self.skip, self.seen = hw, deny, skip, set()
-        self.menuwalk, self.walk = menuwalk, 0
+        self.menuwalk, self.walk = menuwalk or bool(walk), 0
+        self.keys = walk or WALK          # the menu keys, in turn
+        self.skiponce = skiponce
 
     def check(self):
         text = self.hw.screen()
@@ -371,10 +463,11 @@ class Auto:
             sel = [l for l in text.splitlines() if any(c.islower() for c in l[3:])]
             sig = 'MENU|' + '|'.join(sel)
             if sig not in self.seen:
-                self.seen.add(sig)
+                self.seen = {x for x in self.seen if x.startswith('MENU|')}
+                self.seen.add(sig)          # (a test run again is answered again)
                 when = self.hw.line + int(1000 * LINES_PER_MS)
-                if self.menuwalk and self.walk < len(WALK):   # a test by its key
-                    self.hw.press(when, 'KB', WALK[self.walk])
+                if self.menuwalk and self.walk < len(self.keys):   # a test by its key
+                    self.hw.press(when, 'KB', self.keys[self.walk])
                     self.walk += 1
                 else:                         # START: ALL at first, then (walk)
                     self.hw.press(when, 'CON', 1)            # the results
@@ -400,6 +493,8 @@ class Auto:
         step = int(0.35 * 1000 * LINES_PER_MS)
         if p == 'PRESS EVERY KEY':
             codes = KEYCODES[:len(KEYCODES) - self.skip]
+            if self.skiponce:
+                self.skip = 0
             for i, c in enumerate(codes):
                 hw.press(t + (i + 1) * step, 'KB', c | (0x80 if c == 0x3F else 0))
             n = len(codes) + 1
@@ -477,6 +572,13 @@ def main():
     ap.add_argument('--pal', action='store_true')
     ap.add_argument('--key', default='', help='seconds at which a key is pressed, e.g. 3,30')
     ap.add_argument('--snap', default='', help='seconds at which to print the screen')
+    ap.add_argument('--shot', default='', help='SECS:FILE.png,... : save the screen as a picture')
+    ap.add_argument('--shoton', action='append', default=[],
+                    help='TEXT@SECS@FILE.png : a picture SECS after TEXT first shows on screen')
+    ap.add_argument('--osrom', help='a real OS ROM file (10K 400/800 or 16K XL/XE) instead of the stand-in')
+    ap.add_argument('--basic', help='a real 8K BASIC ROM: XL/XE built in, or a 400/800 cartridge')
+    ap.add_argument('--palette', default='//TRUENAS/Media/games/ATARI800/ntsc.act',
+                    help='768-byte RGB palette for --shot (the MiSTer core palette)')
     ap.add_argument('--flaky', help='BANK:BIT:P  a bit that reads wrong with chance P per read')
     ap.add_argument('--insert', nargs=2, metavar=('SECONDS', 'CAS'),
                     help='start playing another tape (e.g. a -part2.cas) at that time')
@@ -484,6 +586,8 @@ def main():
     ap.add_argument('--until', type=float, help='stop at this simulated time (s)')
     ap.add_argument('--deny', default='', help='with --auto: answer No where the screen shows these (comma list)')
     ap.add_argument('--skip', type=int, default=0, help='with --auto: leave this many keys unpressed')
+    ap.add_argument('--walk', help='with --auto: menu digits to press in turn, e.g. 22')
+    ap.add_argument('--skiponce', action='store_true', help='--skip only the first keyboard test')
     ap.add_argument('--menuwalk', action='store_true',
                     help='with --auto: run the menu tests one at a time by their keys')
     ap.add_argument('--peek', help='LO-HI: print these BSS bytes (hex offsets) at the end')
@@ -519,6 +623,26 @@ def main():
     keys = [(to_line(t), to_line(t) + to_line(0.25)) for t in a.key.split(',') if t]
     snaps = sorted(to_line(t) for t in a.snap.split(',') if t)
     hw = Atari(a.ram, stuck, a.mirror, a.xl or a.xe, a.pal, keys, a.xe, xstuck)
+    if a.osrom:
+        hw.osrom = Path(a.osrom).read_bytes()
+        assert len(hw.osrom) in (0x2800, 0x4000), 'an OS ROM is 10K or 16K'
+    if a.basic:
+        hw.basic = Path(a.basic).read_bytes()
+        assert len(hw.basic) == 0x2000, 'a BASIC ROM is 8K'
+    shots = sorted((to_line(t), f) for t, f in (x.split(':', 1) for x in a.shot.split(',') if x))
+    if shots:
+        palette = Path(a.palette).read_bytes()
+        if hw.osrom is None:
+            sys.exit('--shot needs --osrom (the screen font comes from it)')
+        font = hw.osrom[0x2000:0x2400] if len(hw.osrom) == 0x4000 else hw.osrom[0x800:0xC00]
+    when = [[x, to_line(d), f, None]   # [text, delay, file, due line]
+            for x, d, f in (t.split('@', 2) for t in a.shoton)]
+    if when and not shots:
+        palette = Path(a.palette).read_bytes()
+        if hw.osrom is None:
+            sys.exit('--shoton needs --osrom (the screen font comes from it)')
+        font = hw.osrom[0x2000:0x2400] if len(hw.osrom) == 0x4000 else hw.osrom[0x800:0xC00]
+    next_look = 0
     if a.forge:
         forge(hw, a.forge)
     hw.xealias = a.xealias
@@ -540,7 +664,9 @@ def main():
     entered = set()
     insert_at = to_line(a.insert[0]) if a.insert else None
     frame = 0
-    auto = Auto(hw, [d for d in a.deny.split(',') if d], a.skip, a.menuwalk) if a.auto else None
+    auto = Auto(hw, [d for d in a.deny.split(',') if d], a.skip, a.menuwalk,
+                [WALK[[1, 2, 3, 5, 6, 4, 7].index(int(c))] for c in a.walk] if a.walk else None,
+                a.skiponce) if a.auto else None
     next_auto = 0
     while True:
         if auto and hw.line >= next_auto:
@@ -567,6 +693,18 @@ def main():
             print(f'stage 2 entered at {hw.line / LINES_PER_MS / 1000:.1f} s')
         mpu.step()
         steps += 1
+        if shots and hw.line >= shots[0][0]:
+            hw.render(shots.pop(0)[1], palette, font)
+        if when and hw.line >= next_look:
+            next_look = hw.line + 2000
+            text = hw.screen()
+            for w in when:
+                if w[3] is None and w[0] in text:
+                    w[3] = hw.line + w[1]
+                if w[3] is not None and w[3] >= 0 and hw.line >= w[3]:
+                    hw.render(w[2], palette, font)
+                    print(f'shot {w[2]} at {hw.line / LINES_PER_MS / 1000:.1f} s')
+                    w[3] = -1
         if snaps and hw.line >= snaps[0]:
             print(f'--- screen at {snaps.pop(0) / LINES_PER_MS / 1000:.1f} s'
                   f'  COLBK ${hw.regs.get(0xD01A, 0):02X}')
