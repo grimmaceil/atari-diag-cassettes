@@ -10,12 +10,16 @@
 ; tests it), unless built with:
 ;   OWNTEST (diag-400-burnin): every pass also checks this stage's own RAM.
 ;     Its image sum must not change from pass 1's (the code changes a few of
-;     its own operands as it runs, the same way every pass), and every
-;     byte from $0800 up to TSTART, and the screen block, takes a NOT test:
-;     invert it, read it back, put it back, read it back. That proves each
-;     bit holds 0 and 1 without losing the code. The test runs from a copy
-;     in low RAM ($0480), with the VBI and ANTIC off. Faults go in the log
-;     as bank 9 ("B9", this tape's RAM), and beep as bank 1.
+;     its own operands as it runs, the same way every pass). Then each page
+;     from $0800 up to TSTART is saved in the screen block, given March C-
+;     ($00/$FF and $55/$AA) and an address-in-page test, put back and read
+;     back: the full patterns, and the code survives. The screen block
+;     takes a NOT test (invert, read back, put back, read back), and with
+;     no display (no tested buffer) so does this stage's RAM. These tests
+;     run from copies in low RAM ($0400-$04FF), written with branches and
+;     (zp),y only so they run from anywhere and never test themselves; the
+;     VBI and ANTIC are off. Faults go in the log as bank 9 ("B9", this
+;     tape's RAM), and beep as bank 1.
 ;   NOXL (diag-400-burnin): no RAM under the OS, no 130XE banks (an 8K
 ;     machine is never an XL), which leaves the room for OWNTEST.
 ;   BOUNCE (diag-burnin, 16K and up): two copies take turns. Copy A runs at
@@ -76,10 +80,15 @@ FONT	= $3800			; ROM font copy while the OS is switched out
 	.endif
 	.ifdef OWNTEST
 LDRFOLD	= 1			; report.asm: bank 9 (own RAM) beeps as bank 1
-NTCODE	= $0480			; the NOT test's copy, in low RAM
-NTPTR	= $88			; NOT test: page pointer, errors, the byte
-NTERR	= $8A
-NTSAV	= $8B
+PICBASE	= $0400			; the page and NOT tests' copies, in low RAM
+PGCODE	= PICBASE		; (the cassette buffer: free once booted)
+NTCODE	= PICBASE+[ntsrc-pgsrc]
+NTPTR	= $88			; page under test
+NTERR	= $8A			; bad bits found
+NTSAV	= $8B			; NOT test: the byte
+BUFP	= $8C			; page test: the save page (in the screen block)
+PA	= $8E			; page test: the march's two patterns
+PB	= $8F
 REFSUM	= BSS+$F1		; 2: pass 1's image sum
 REFOK	= BSS+$F3		; nonzero: REFSUM is set
 	.endif
@@ -148,11 +157,12 @@ cl_log	sta FIRSTLO,x
 bi_off	sta XOFF
 	.endif
 	.ifdef OWNTEST
-	ldx #NTLEN-1		; the NOT test into low RAM
-nt_cp	lda ntsrc,x
-	sta NTCODE,x
-	dex
-	bpl nt_cp
+	ldx #0			; the page and NOT tests into low RAM
+nt_cp	lda pgsrc,x
+	sta PGCODE,x
+	inx
+	cpx #PICLEN
+	bne nt_cp
 	.endif
 	lda #60
 	ldx ISPAL
@@ -941,9 +951,10 @@ bc_i3	dec BLEFT
 
 	.ifdef OWNTEST
 ; owntest: this stage's own RAM (called with the VBI off). The image sum
-; first, then the NOT test over $0800 up to TSTART and the screen block,
-; with ANTIC off (the display list is in that block). The clock gets the
-; time back as a fixed allowance, like the low RAM test.
+; first, then the page test over $0800 up to TSTART (the NOT test without a
+; display), then the NOT test over the screen block, with ANTIC off (the
+; display list is in that block; the screen is redrawn after). The clock
+; gets the time back as a fixed allowance, like the low RAM test.
 owntest
 	.ifdef BOUNCE
 	lda #>LOAD		; copy B, or A with copy B coming: the bounce
@@ -993,32 +1004,138 @@ ot_cmp	lda SUM			; changed: the bits that differ, as a hint
 	lda #0
 	sta DMACTL
 	sta NTPTR
+	sta BUFP
 	lda #>LOAD
 	sta NTPTR+1
 	ldx #TSTART-[>LOAD]
+	lda DISPOK		; no display: no tested save page, the NOT test
+	bne ot_pg0
 	jsr NTCODE
-	lda DISPOK
-	beq ot_end
-	lda SCRPG
+	ldx #9			; about 0.15 s
+	bne ot_end
+ot_pg0	lda SCRPG		; the page test, page by page
+	sta BUFP+1
+ot_pg	jsr PGCODE
+	inc NTPTR+1
+	dex
+	bne ot_pg
+	lda SCRPG		; then the screen block, NOT test
 	sta NTPTR+1
 	ldx #4
 	jsr NTCODE
-	lda SCRON		; the screen back, as it was
-	beq ot_end
-	lda #$22
-	sta DMACTL
+	lda SCRON		; the screen back: it was the save page
+	beq ot_nt
+	jsr scr_on
+	jsr bscreen
+	jsr showpass
+	jsr showlog
+ot_nt	ldx #60			; about 1 s
 ot_end	lda NTERR
 	ora BADMASK+LDRIDX
 	sta BADMASK+LDRIDX
-	ldx #9			; about 0.15 s
 ot_t	jsr tick
 	dex
 	bne ot_t
 	rts
 
-; The NOT test, copied to NTCODE (so it never inverts itself) and written to
-; run from anywhere: (NTPTR),y only. X pages from NTPTR; errors ORed into
-; NTERR.
+; The page test, copied to PGCODE and written to run from anywhere:
+; branches and (zp),y only. The page at NTPTR: saved at BUFP, March C- with
+; PA/PB = $00/$FF then $55/$AA (up w0; up r0 w1; up r1 w0; down r0 w1;
+; down r1 w0; r0), then each byte its own low address and its complement,
+; then put back from BUFP and read back. Bad bits ORed into NTERR. Keeps X.
+pgsrc	ldy #0
+pg_sv	lda (NTPTR),y
+	sta (BUFP),y
+	iny
+	bne pg_sv
+	sty PA			; ($00/$FF first)
+	dey
+	sty PB
+	iny			; (Y back to 0)
+pg_m	lda PA			; up: w0
+pg_w0	sta (NTPTR),y
+	iny
+	bne pg_w0
+pg_a	lda (NTPTR),y		; up: r0, w1
+	eor PA
+	ora NTERR
+	sta NTERR
+	lda PB
+	sta (NTPTR),y
+	iny
+	bne pg_a
+pg_b	lda (NTPTR),y		; up: r1, w0
+	eor PB
+	ora NTERR
+	sta NTERR
+	lda PA
+	sta (NTPTR),y
+	iny
+	bne pg_b
+	dey			; down: r0, w1
+pg_c	lda (NTPTR),y
+	eor PA
+	ora NTERR
+	sta NTERR
+	lda PB
+	sta (NTPTR),y
+	dey
+	cpy #$FF
+	bne pg_c
+pg_d	lda (NTPTR),y		; down: r1, w0 (Y is $FF again)
+	eor PB
+	ora NTERR
+	sta NTERR
+	lda PA
+	sta (NTPTR),y
+	dey
+	cpy #$FF
+	bne pg_d
+	iny			; r0
+pg_e	lda (NTPTR),y
+	eor PA
+	ora NTERR
+	sta NTERR
+	iny
+	bne pg_e
+	lda PA			; then $55/$AA, then on
+	bne pg_ai
+	lda #$55
+	sta PA
+	lda #$AA
+	sta PB
+	bne pg_m
+pg_ai	tya			; address in page: each byte its low address
+	sta (NTPTR),y
+	iny
+	bne pg_ai
+pg_g	tya			; read it, write the complement
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	tya
+	eor #$FF
+	sta (NTPTR),y
+	iny
+	bne pg_g
+pg_h	tya			; read the complement
+	eor #$FF
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	iny
+	bne pg_h
+pg_r	lda (BUFP),y		; put the page back, read it back
+	sta (NTPTR),y
+	eor (NTPTR),y
+	ora NTERR
+	sta NTERR
+	iny
+	bne pg_r
+	rts
+
+; The NOT test, copied after the page test (so it never inverts itself) and
+; written the same way. X pages from NTPTR; errors ORed into NTERR.
 ntsrc	ldy #0
 nt_lp	lda (NTPTR),y
 	sta NTSAV
@@ -1038,7 +1155,10 @@ nt_lp	lda (NTPTR),y
 	dex
 	bne nt_lp
 	rts
-NTLEN	= *-ntsrc
+PICLEN	= *-pgsrc
+	.if PICLEN>256
+	.error "page and NOT tests must fit $0400-$04FF"
+	.endif
 	.endif
 
 ; bankrange: RBS/RBE = the pages of bank CURBANK to test. C set if none.
