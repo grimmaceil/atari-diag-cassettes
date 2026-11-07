@@ -12,6 +12,11 @@
 ; Then the final code: the loader area counts as bank 1 for the beeps.
 ; Built with -d:S1BSS=... -d:S1TSTART=... from stage 1's label table.
 ;
+; ONELOAD (the 48k+ tape, with CHAIN3): not loaded from tape but copied to
+; $0800 by stage 1, which ran at $4000. The relocate test covers stage 1's
+; area there, and the system tests are already in RAM right after this
+; stage's BSS page, so no loader: the code plays, then on to them.
+;
 ; CHAIN3 (the 48k tape): then stage 3, the system tests, loads at $4000 if
 ; the RAM it needs passed (banks 1 and 2: the loader checks). All passed:
 ; it goes on by itself after the jingle. A fault elsewhere: its code plays,
@@ -24,10 +29,18 @@
 
 LDRFOLD	= 1			; report.asm: fold the loader area into bank 1
 SROW	= BSS+$DB		; summary: row of the item being printed
+	.ifdef ONELOAD
+FONT	= $B800			; ROM font copy while the OS is out (bank 3:
+				; $0800-$3FFF holds the payload)
+S2LOAD	= $0800
+S1LOADPG = $3F			; stage 1's area: its BSS page, then the image
+	.else
 FONT	= $3800			; ROM font copy while the OS is switched out
+S2LOAD	= $2000
+S1LOADPG = $08
+	.endif
 
 	opt h-
-S2LOAD	= $2000
 	org S2LOAD
 
 ; Same header layout as a boot file: stage 1 checks the record count and
@@ -46,7 +59,11 @@ tk_lp	lda S1BSS,x
 	sta BSS,x
 	inx
 	bne tk_lp
-	.ifdef CHAIN3
+	.ifdef ONELOAD
+	lda #<[BSS+$106]	; a press (or a pass) goes on to the system tests,
+	sta CONTVEC		; right after this stage's BSS page
+	lda #>[BSS+$106]
+	.elseif .def CHAIN3
 	lda #0			; stage 1's load may have needed a retry: its
 	sta L2STAT		; SIO status is not about stage 3
 	lda #<load2		; a press (or a pass) goes on to stage 3
@@ -78,7 +95,7 @@ rl_go	lda #LDRIDX
 	sta CURBANK
 	sta BANKOVR
 	jsr setfmask
-	lda #$08
+	lda #S1LOADPG
 	sta RBS
 	lda #S1TSTART
 	sta RBE
@@ -112,11 +129,13 @@ fin_bad	jmp report
 redraw	= summary		; scrtoggle's text screen
 
 	.ifdef CHAIN3
+	.ifndef ONELOAD
 LDTO	= $4000			; loader.asm: stage 3, in bank 2
 SKIPEOF	= 1			; loader.asm: stage 2's own EOF record comes first
 results	= summary		; loader.asm: its redraw, with the L2MSG line
 final	= fin			; and the tape's end when stage 3 can't load
 	icl '../common/loader.asm'
+	.endif
 ; clrrow: blank row A.
 clrrow	ldx #0
 	jsr at
@@ -408,11 +427,19 @@ puts_st	pha
 s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF
 s_hrel	dta d'LOADER AREA',$FF
 s_hsum	dta d'SUMMARY',$FF
+	.ifdef ONELOAD
+s_tldr	dta d'TESTING THE IMAGE AREA $3F00-$',$FF
+	.else
 s_tldr	dta d'TESTING LOADER AREA $0800-$',$FF
+	.endif
 s_i1	dta d'1 LOW RAM $0000-$07FF',$FF
 s_i2	dta d'2 DISPLAY CHECKS',$FF
 s_i3	dta d'3 VIDEO CHECK',$FF
+	.ifdef ONELOAD
+s_i7	dta d'7 IMAGE AREA $3F00-$',$FF
+	.else
 s_i7	dta d'7 LOADER AREA $0800-$',$FF
+	.endif
 s_i8	dta d'8 BANK 4 $C000-$FFFF',$FF
 s_i9	dta d'9 130XE BANKS 5-8',$FF
 s_xe	dta d' XE',$FF

@@ -25,8 +25,9 @@ SHARE = Path('//TRUENAS/Media/games/ATARI800')   # MiSTer Atari800 core's folder
 # The system tapes are one main.asm with the tests picked by WANT_* defines.
 # The 400 and 16k sets share tape 1: its stage 2 (16K and up) relocates the
 # RAM test to the RAM stage 1 sat in, and tests the XL/XE extras where it
-# finds them. The 48k set is one tape: the same two RAM stages (CHAIN3: stage
-# 2 then loads stage 3) and the system tests as stage 3 (CHAIN), at $4000.
+# finds them. The 48k+ set is one boot file (build_oneload): tape 1's stage 1
+# at $4000 (ONELOAD), with a payload built for $0800 appended: stage 2
+# (ONELOAD+CHAIN3), its BSS page, then the system tests (CHAIN, SYSLOAD).
 ALL7 = dict(WANT_ROM=1, WANT_KB=1, WANT_CON=1, WANT_JOY=1, WANT_PAD=1,
             WANT_POK=1, WANT_GTIA=1)
 S400 = {'SETNO': 0}
@@ -41,8 +42,7 @@ TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
          ('tape1', 'diag-16k-01-ram', ['main.asm', 'stage2.asm'], {}),
          ('system', 'diag-16k-02-system', ['main.asm'],
           dict(ALL7, SETNO=1, TAPENO=2, MENU=1, BIGSTAGE=1)),
-         ('tape1', 'diag-48k-xl-xe', ['main.asm', 'stage2.asm', 'system/main.asm'],
-          dict(ALL7, SETNO=2, CHAIN3=1, CHAIN=1, MENU=1)),
+         ('oneload', 'diag-48k-xl-xe', [], dict(ALL7, SETNO=2, MENU=1)),
          ('tape2', 'diag-burnin', ['main.asm'], {})]
 
 
@@ -85,6 +85,36 @@ def build(src, name, stages, defines, label):
                                    for k in range(2, len(stages) + 1)]
 
 
+def build_oneload(name, defines, label):
+    """The 48k+ tape: one boot file. The payload's addresses depend on stage
+    1's BSS (stage 2 takes its results over) and stage 1's size on the
+    payload's, but no size depends on an address, so two rounds settle it."""
+    out = BUILD / name
+    s2, sy, pay = Path(f'{out}.s2'), Path(f'{out}.sys'), BUILD / 'payload48.bin'
+    s1d = dict(defines, ONELOAD=1)
+    s1 = {'BSS': 0x9000, 'TSTART': 0x91}         # a guess, for the first round
+    for _ in range(3):
+        d2 = dict(defines, ONELOAD=1, CHAIN3=1, S1BSS=f"${s1['BSS']:04X}",
+                  S1TSTART=f"${s1['TSTART']:02X}")
+        mads('tape1', 'stage2.asm', s2, d2)
+        bss2 = labels(f'{s2}.lab')['BSS']
+        dsy = dict(defines, CHAIN=1, SYSLOAD=f'${bss2 + 0x100:04X}', PREVBSS=f'${bss2:04X}')
+        mads('system', 'main.asm', sy, dsy)
+        img2 = Path(f'{s2}.bin').read_bytes()
+        assert 0x0800 + len(img2) == bss2
+        pay.write_bytes(img2 + bytes(0x100) + Path(f'{sy}.bin').read_bytes())
+        mads('tape1', 'main.asm', out, s1d)
+        new = labels(f'{out}.lab')
+        if new['BSS'] == s1['BSS']:
+            break
+        s1 = new
+    else:
+        sys.exit('build_oneload: stage 1 BSS did not settle')
+    subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
+                    '--boot', f'{out}.bin', f'{out}.lab', '--name', label], check=True)
+    return [Path(f'{out}.cas')]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--fault', help='BANK,BIT[,EVERY]  (bank 0 = low RAM; EVERY: burn-in '
@@ -97,6 +127,9 @@ def main():
     cas = []
     for src, name, stages, defs in TAPES:
         d = dict(defs, FAST=1) if a.fast else dict(defs)
+        if src == 'oneload':
+            cas += build_oneload(name, d, f'A8 {name.upper()}')
+            continue
         cas += build(src, name, stages, d, f'A8 {name.upper()}')
         if a.fault:
             bank, bit, *every = a.fault.split(',')

@@ -32,7 +32,10 @@
 QUICKSCR = 1			; display.asm: quick screen-block test
 
 	opt h-
-	.ifdef CHAIN
+	.ifdef SYSLOAD
+LOAD	= SYSLOAD		; the 48k+ one-load tape: in the payload, right
+				; after stage 2's BSS page (build.py)
+	.elseif .def CHAIN
 LOAD	= $4000
 	.else
 LOAD	= $0800
@@ -204,3 +207,8 @@ IMGEND
 NREC	= [IMGEND-LOAD]/128
 BSS	= IMGEND
 TSTART	= [>BSS]+1
+	.ifdef SYSLOAD
+	.if [>BSS]+1>$3C
+	.error "system tests too big for the one-load payload (BSS must end below $3C00)"
+	.endif
+	.endif

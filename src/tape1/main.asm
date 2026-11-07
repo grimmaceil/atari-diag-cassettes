@@ -16,13 +16,28 @@
 ; Build flags (mads -d:NAME=value):
 ;   FAULT_BANK=0..4, FAULT_BIT=1..8   inject a stuck bit; bank 0 = low RAM
 ;   FAST=1                            skip the $55/$AA march pass
+;   ONELOAD=1                         the 48k+ tape, one boot file (below)
+;
+; ONELOAD: the whole tape is this one boot file, loaded at $4000: this
+; stage, then a payload built to run at $0800 (stage 2 and the system
+; tests, build.py's build_oneload). This stage tests $0800-$3FFF and
+; everything above the image, then copies the payload into the proven
+; $0800-$3FFF and runs it. Stage 2 then tests the image's own RAM. The image
+; checksum proves the RAM the OS loaded it into held it. The working storage
+; (BSS) is the page below the image, $3F00, not the page after it: that one
+; would be in bank 3, so a bank 3 fault would take the reporting down with
+; it. Stage 1 tests $0800-$3EFF; stage 2 tests $3F00 up through the image.
 
 	icl '../common/hw.asm'
 	icl '../common/vars.asm'
 	icl '../common/faults.asm'
 
 	opt h-
+	.ifdef ONELOAD
+LOAD	= $4000
+	.else
 LOAD	= $0800
+	.endif
 	org LOAD
 
 ; Cassette boot header. The OS reads NREC records to LOAD, then JSRs LOAD+6.
@@ -43,9 +58,15 @@ rt_go	jsr ramtest
 	lda DISPOK
 	beq rt_res
 	jsr results
+	.ifdef ONELOAD
+rt_res	lda #<golow		; a press (or a pass) goes on to the payload
+	sta CONTVEC
+	lda #>golow
+	.else
 rt_res	lda #<load2		; a press (or a pass) goes on to stage 2
 	sta CONTVEC
 	lda #>load2
+	.endif
 	sta CONTVEC+1
 	lda SCRON
 	beq final
@@ -60,7 +81,52 @@ res_bad	jmp report
 
 redraw	= results		; scrtoggle's text screen
 
+	.ifdef ONELOAD
+; golow: the payload into $0800 and on to it, if bank 1 (where it goes)
+; passed and the screen block is above the image.
+PAYDEST	= $0800
+golow	lda #0			; from here on a result is final
+	sta CONTVEC+1
+	lda LOADERR		; the image (and so the payload) loaded bad
+	bne gl_img
+	lda BADMASK+1
+	bne gl_no
+	lda SCRPG		; (and the screen above the image: stage 2
+	cmp #TSTART		; tests the image's RAM under it)
+	bcc gl_no
+	lda #<PAYLOAD
+	sta PTR
+	lda #>PAYLOAD
+	sta PTR+1
+	lda #<PAYDEST
+	sta SPTR
+	lda #>PAYDEST
+	sta SPTR+1
+	ldx #PAYPG
+	ldy #0
+gl_cp	lda (PTR),y
+	sta (SPTR),y
+	iny
+	bne gl_cp
+	inc PTR+1
+	inc SPTR+1
+	dex
+	bne gl_cp
+	jmp PAYDEST+6
+gl_img	lda #<s_l2_img
+	ldy #>s_l2_img
+	bne gl_msg
+gl_no	lda #<s_l2_bad
+	ldy #>s_l2_bad
+gl_msg	sta L2MSG
+	sty L2MSG+1
+	lda SCRON
+	beq gl_f
+	jsr results
+gl_f	jmp final
+	.else
 	icl '../common/loader.asm'
+	.endif
 ; clrrow: blank row A.
 clrrow	ldx #0
 	jsr at
@@ -251,7 +317,22 @@ rt_next	inc CURBANK
 	bne rt_bank
 
 ; Address-in-address over everything at once, so a bank that mirrors
-; another (an address-line or decoder fault) shows up too.
+; another (an address-line or decoder fault) shows up too. (ONELOAD: the
+; part below the image first, as its own pass; the list holds two ranges.)
+	.ifdef ONELOAD
+	lda #$08
+	sta RBS
+	lda #>BSS
+	sta RBE
+	jsr split
+	inc INAIA
+	lda #0
+	sta AIAMODE
+	jsr aia
+	inc AIAMODE
+	jsr aia
+	dec INAIA
+	.endif
 	lda #TSTART
 	sta RBS
 	lda RAMTOP
@@ -276,8 +357,19 @@ bankrange lda CURBANK
 	asl
 	asl
 	asl
+		.ifdef ONELOAD
+	cmp #>LOAD		; below the image: from $0800 (low RAM is done)
+	bcs br_hi
+	cmp #$08
+	bcs br_s
+	lda #$08
+	bne br_s
+br_hi	cmp #TSTART		; the image itself: stage 2 tests it
+	bcs br_s
+	.else
 	cmp #TSTART
 	bcs br_s
+	.endif
 	lda #TSTART
 br_s	sta RBS
 	lda CURBANK
@@ -287,6 +379,12 @@ br_s	sta RBS
 	asl
 	asl
 	asl
+	.ifdef ONELOAD
+	cmp #>LOAD		; bank 1 ends below the BSS page ($3F00)
+	bne br_t
+	lda #>BSS
+br_t
+	.endif
 	cmp RAMTOP
 	bcc br_e
 	lda RAMTOP
@@ -371,6 +469,24 @@ rs_bank	lda RROW
 	jsr puts
 	jsr bankrange
 	bcc rs_found
+	.ifdef ONELOAD
+	lda CURBANK		; RAM there, all of it image: stage 2 tests it
+	sec
+	sbc #1
+	asl
+	asl
+	asl
+	asl
+	asl
+	asl
+	cmp RAMTOP
+	bcs rs_none
+	lda #<s_instg
+	ldy #>s_instg
+	jsr puts
+	jmp rs_next
+rs_none
+	.endif
 	lda #<s_none
 	ldy #>s_none
 	jsr puts
@@ -452,6 +568,9 @@ s_dol	dta d' $',$FF
 s_00dash dta d'00-$',$FF
 s_ff	dta d'FF  ',$FF
 s_none	dta d'NOT FOUND',$FF
+	.ifdef ONELOAD
+s_instg	dta d'IN STAGE 2',$FF
+	.endif
 s_pass	dta d'PASS',$FF
 s_fail	dta d'FAIL'*,$FF
 s_bank4	dta d'BANK 4 $C000-$FFFF  IN STAGE 2',$FF
@@ -462,7 +581,12 @@ s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
 s_l2load dta d'LOADING STAGE 2, KEEP TAPE PLAYING',$FF
 s_l2pre	dta d'STAGE 2: ',$FF
 s_l2_8k	dta d'NEEDS 16K. NEXT: 400 TAPE 02',$FF
+	.ifdef ONELOAD
+s_l2_bad dta d'BANK 1 BAD: USE THE 400 SET',$FF
+s_l2_img dta d'LOAD BAD: USE THE 400 SET',$FF
+	.else
 s_l2_bad dta d'NOT LOADED, BANK 1 FAILED',$FF
+	.endif
 s_l2_big dta d'TOO BIG FOR THE GOOD RAM',$FF
 s_l2_sio dta d'ERROR $',$FF
 s_l2_hdr dta d'NOT ON TAPE',$FF
@@ -484,6 +608,14 @@ NPAT	= *-pats
 	icl '../common/info.asm'
 	icl '../common/bits.asm'
 
+	.ifdef ONELOAD
+; The payload: stage 2 and the system tests as built to run at PAYDEST
+; (build.py writes the file before this stage is assembled).
+PAYLOAD	ins '../../build/payload48.bin'
+PAYEND
+PAYPG	= [PAYEND-PAYLOAD+$FF]/$100
+	.endif
+
 ; Pad to a whole page; the last two bytes hold the image sum (mkcas.py).
 PADTO	= [[*+2+$FF]/$100]*$100
 	.if PADTO-*-2>0
@@ -492,5 +624,10 @@ PADTO	= [[*+2+$FF]/$100]*$100
 CKSUM	.word 0
 IMGEND
 NREC	= [IMGEND-LOAD]/128
+	.ifdef ONELOAD
+BSS	= LOAD-$100		; (see the top)
+TSTART	= >IMGEND		; the first page past the image
+	.else
 BSS	= IMGEND
 TSTART	= [>BSS]+1
+	.endif

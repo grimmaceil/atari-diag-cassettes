@@ -13,15 +13,22 @@ the fallback for any machine: it needs only the first 8K to work.
 |---|---|---|
 | `diag-400-*` | 8K 400 | 01 RAM, then four small tapes that each fit 8K by themselves: 02 ROMs, 03 input, 04 ports, 05 sound and video |
 | `diag-16k-*` | 16K-32K 400/800 | 01 RAM, 02 system: all seven tests in one load, with a menu |
-| `diag-48k-xl-xe` | 48K 800, XL/XE (32K and up) | one tape, three stages: RAM, the rest of RAM (the RAM the first stage sat in, the RAM under the OS, the 130XE banks), then the system tests with the menu |
+| `diag-48k-xl-xe` | 48K 800, XL/XE | one tape, one load: RAM, the rest of RAM (where the tape itself loaded, the RAM under the OS, the 130XE banks), then the system tests with the menu |
 | `diag-burnin` | all | one version |
 
-The 48k tape works out each next step itself:
-- All passed: it goes on by itself.
-- A RAM fault where the system tests don't load: its code plays, then START
-  goes on, and the fault shows again as test 8 (item = bank) in the results
-  and the final code.
-- Bank 1 or 2 bad, or less than 32K: it stops, and says which set to use.
+The 48k+ tape is a single boot file, loaded at $4000. It tests $0800-$3FFF
+and everything above itself, copies the rest of its code into the proven RAM
+at $0800, and from there tests the RAM it was loaded into. Then come the RAM
+under the OS, the 130XE banks and the system tests. A RAM fault plays its
+code; START then goes on, and the fault shows again as test 8 (item = bank)
+in the results and the final code. Use the 400 set instead if any of these
+happen:
+- bank 1 is bad
+- the tape won't load
+- one long beep and the end tone, with no picture: a bad image checksum, so
+  the RAM it loaded into ($4000-$84FF) is bad
+- no green chirp after the load: the RAM its first part runs in
+  ($4000-$51FF) is bad
 
 The tapes of a set run in order. Each one relies only on what the earlier
 ones proved; for example, the keyboard is tested before any test asks a Y/N

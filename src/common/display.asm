@@ -148,8 +148,16 @@ fs_next	ldx CNT
 ; Candidates: just above the stage (fits an 8K 400), then the top 1K of
 ; each 16K bank.
 SCR1	= [TSTART+3]&$FC
+	.ifdef ONELOAD
+scrcand	.byte SCR1, $BC, $BC, $BC	; $3C holds the BSS page, $7C the image
+	.else
 scrcand	.byte SCR1, $3C, $7C, $BC
-	.if .def BIGSTAGE		; the 16k/48k system tapes: 16K
+	.endif
+	.if .def ONELOAD		; the 48k+ tape: a 48K machine
+	.if SCR1+4>$C0
+	.error "stage too big: no screen block fits in 48K"
+	.endif
+	.elseif .def BIGSTAGE		; the 16k system tape: 16K
 	.if SCR1+4>$40
 	.error "stage too big: no screen block fits in 16K"
 	.endif
