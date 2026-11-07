@@ -65,19 +65,11 @@ pk_vl	lda DISPOK
 	adc #$11
 	jsr putc
 	PRINT 8, 0, s_heard
-pk_play	lda VOICE		; X = the voice's AUDF offset
+pk_play	lda VOICE		; the voice, over and over, until the answer
 	asl
-	tax
-	lda #F_LONG
-	sta AUDF1,x
-	lda #AUD_ON
-	sta AUDC1,x
-	WAITMS 1500
-	lda VOICE
-	asl
-	tax
-	lda #AUD_OFF
-	sta AUDC1,x
+	sta YNV
+	lda #1
+	sta YNSND
 	jsr yesno
 	bcs pk_heard
 	ldx VOICE		; items 3-6

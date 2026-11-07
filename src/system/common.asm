@@ -10,10 +10,8 @@
 TEST	= BSS+$E0		; current test, 1-7
 NEXTVEC	= BSS+$E1		; 2: where the test flow goes on to
 STASH	= BSS+$E3		; 8: BADMASK 1-8 while one test's code plays
-ANSTO	= BSS+$EB		; 2: yes/no timeout, frames
 TIDX	= BSS+$ED		; next tlist entry, times 2
 T3D	= BSS+$70		; 96 bytes of test data:
-RTIME	= T3D+$00		; 2: frames left in a timed wait
 NPORT	= T3D+$02		; joystick ports on this machine (paddles: twice)
 				; $03-$1F: test 1's results (kept for the summary)
 TSCR	= T3D+$20		; $20-$5F: scratch, each test its own use
@@ -28,14 +26,16 @@ tst_xl	sta NPORT
 	sta TIDX
 	.ifdef MENU
 	sta MRUN
-	sta MSEL
 	sta MMODE
+	tax			; MNT: the tests on the tape
+tst_n	lda ttests,x
+	beq tst_nt
+	inx
+	bne tst_n
+tst_nt	stx MNT
+	stx MSEL		; the ALL line first
 	lda DISPOK		; no picture: no menu, all of them in order
 	beq tst_all
-	lda #<[10*60]		; the menu runs them all if left alone 10 s
-	sta MIDLE
-	lda #>[10*60]
-	sta MIDLE+1
 	jmp menu
 tst_all	inc MMODE
 	.endif
@@ -54,8 +54,12 @@ tend	.ifdef MENU
 	.ifdef MENU
 	lda MMODE
 	bne te_x
+	inc MSEL		; the next test (after the last: the results)
+	lda MSEL
+	cmp MNT
+	bne te_m
 	inc MSEL
-	lda #<menu
+te_m	lda #<menu
 	sta NEXTVEC
 	lda #>menu
 	sta NEXTVEC+1
@@ -84,17 +88,44 @@ vs_2	lda VCOUNT
 	bcs vs_2
 	rts
 
-; yesno: wait up to ~15 s for an answer. C set: Y or START. C clear: N,
-; SELECT or no answer. Console keys too, so a dead keyboard can answer.
+; yesno: wait for the answer, as long as it takes. C set: Y or START. C
+; clear: N or SELECT. Console keys too, so a dead keyboard can answer. The
+; border is purple while it waits, so a question shows without a picture.
+; YNSND: the sound being asked about, repeated until the answer (about 0.7 s
+; on, 0.5 s off): 0 none, 1 POKEY voice YNV/2, 2 the console speaker. A key
+; pressed while the speaker tone runs (the CPU is busy making it) still
+; counts: POKEY latches it in IRQST.
+YNSND	= BSS+$F4
+YNV	= BSS+$F5		; POKEY voice times 2 (its AUDF/AUDC offset)
+YNFRM	= BSS+$F6		; frame in the on/off cycle
 yesno	jsr waitrel
-	lda #<[15*60]
-	sta ANSTO
-	lda #>[15*60]
-	sta ANSTO+1
-yn_lp	jsr vsync
-	lda SKSTAT		; a key held?
-	and #4
+	lda #C_PURPLE
+	sta COLBK
+	lda #$40		; the keyboard IRQ latch (the CPU masks the IRQ)
+	sta IRQEN
+	lda #0
+	sta YNFRM
+yn_lp	lda YNFRM
+	bne yn_s1
+	jsr ynon
+	jmp yn_f
+yn_s1	cmp #42
+	bne yn_f
+	jsr ynoff
+yn_f	jsr vsync
+	inc YNFRM
+	lda YNFRM
+	cmp #72
+	bne yn_k
+	lda #0
+	sta YNFRM
+yn_k	lda IRQST		; a key since the last look?
+	and #$40
 	bne yn_con
+	lda #0
+	sta IRQEN
+	lda #$40
+	sta IRQEN
 	lda KBCODE
 	and #$3F
 	cmp #$2B		; Y
@@ -106,42 +137,48 @@ yn_con	lda CONSOL
 	bcc yn_yes
 	lsr			; SELECT
 	bcc yn_no
-	lda ANSTO
-	bne yn_dec
-	dec ANSTO+1
-yn_dec	dec ANSTO
-	lda ANSTO
-	ora ANSTO+1
-	bne yn_lp
-yn_no	jsr waitrel
-	clc
-	rts
-yn_yes	jsr waitrel
-	sec
+	jmp yn_lp
+yn_no	clc
+	bcc yn_x
+yn_yes	sec
+yn_x	php
+	jsr ynoff
+	lda #0
+	sta IRQEN
+	sta YNSND
+	lda #C_BLACK
+	sta COLBK
+	jsr waitrel
+	plp
 	rts
 
-; settime: RTIME = A seconds (in frames).
-settime	tax
+; ynon/ynoff: YNSND's sound on, off. The console speaker has no hardware
+; tone: ynon makes 0.7 s of it then and there (WAITMS toggles the speaker).
+ynon	lda YNSND
+	beq yo_x
+	cmp #1
+	bne yo_spk
+	ldx YNV
+	lda #F_LONG
+	sta AUDF1,x
+	lda #AUD_ON
+	sta AUDC1,x
+yo_x	rts
+yo_spk	lda #$08
+	sta SPKMASK
+	WAITMS 700
 	lda #0
-	sta RTIME
-	sta RTIME+1
-rt_lp	lda RTIME
-	clc
-	adc #60
-	sta RTIME
-	bcc rt_nc
-	inc RTIME+1
-rt_nc	dex
-	bne rt_lp
+	sta SPKMASK
+	lda #42			; that was the on time: on to the gap
+	sta YNFRM
 	rts
-; rtick: count a frame off RTIME. Z set when it runs out.
-rtick	lda RTIME
-	bne rk_d
-	dec RTIME+1
-rk_d	dec RTIME
-	lda RTIME
-	ora RTIME+1
-	rts
+ynoff	lda YNSND
+	cmp #1
+	bne yf_x
+	ldx YNV
+	lda #AUD_OFF
+	sta AUDC1,x
+yf_x	rts
 
 ; tresult: the end of test TEST. A pass gives the jingle and goes on after
 ; ~2 s (OPTION holds it). A fail plays that test's code (only that one) and
@@ -277,7 +314,11 @@ fi_n	stx NBANKS
 	lda DISPOK
 	beq fi_chk
 	jsr results
+	.ifdef CHAIN
+fi_chk	ldx #8			; and test 8, the RAM
+	.else
 fi_chk	ldx #7
+	.endif
 fi_lp	lda BADMASK,x
 	bne fi_bad
 	dex
@@ -288,15 +329,14 @@ fi_bad	jmp report
 	.ifdef MENU
 ; ---------------------------------------------------------------------------
 ; The test menu (16k/48k sets): every test on the tape with its state, then
-; the results line. START runs the highlighted line, SELECT moves down,
-; OPTION up; keys 1-7 run that test. After a test it comes back here with
-; the next one highlighted, so START, START... walks the tests forward. Left
-; alone 10 s at power-on, it runs them all in order, then the results and
-; the final code.
-MSEL	= BSS+$EE		; highlighted line (index into ttests; MNT = results)
+; ALL (every test in order) and the results. START runs the highlighted
+; line, SELECT moves down, OPTION up; keys 1-7 run that test. After a test
+; it comes back here with the next one highlighted, so START, START...
+; walks the tests forward. It waits as long as it takes: no timeouts.
+MSEL	= BSS+$EE		; highlighted line: a ttests index, MNT = ALL,
+				; MNT+1 = the results
 MMODE	= BSS+$EF		; nonzero: running all of them in order
 MRUN	= BSS+$F0		; tests run so far, bit per test number
-MIDLE	= BSS+$F1		; 2: frames left before running all (0 = off)
 MNT	= BSS+$F3		; tests on the tape
 
 menu	lda #0
@@ -304,21 +344,7 @@ menu	lda #0
 	jsr mdraw
 	jsr waitrel
 mn_lp	jsr vsync
-	lda MIDLE		; the power-on countdown
-	ora MIDLE+1
-	beq mn_in
-	lda MIDLE
-	bne mn_dec
-	dec MIDLE+1
-mn_dec	dec MIDLE
-	lda MIDLE
-	ora MIDLE+1
-	bne mn_in
-	lda #0			; ran out: all of them, from the first
-	sta MSEL
-	inc MMODE
-	jmp mgo
-mn_in	lda CONSOL
+	lda CONSOL
 	eor #7
 	and #7
 	bne mn_con
@@ -342,17 +368,16 @@ mn_fd	dex
 	bne mn_fd
 	stx MSEL
 	jmp mgo
-mn_con	ldx #0			; any press ends the countdown
-	stx MIDLE
-	stx MIDLE+1
-	lsr
-	bcs mgo		; START
+mn_con	lsr
+	bcs mgo			; START
 	lsr
 	bcc mn_up
-	ldx MSEL		; SELECT: down, round to the top
+	ldx MNT			; SELECT: down (the last line is MNT+1, the
+	inx			; results), round to the top
+	stx MTMP
+	ldx MSEL
+	cpx MTMP
 	inx
-	cpx MNT
-	beq mn_set
 	bcc mn_set
 	ldx #0
 	beq mn_set
@@ -360,15 +385,19 @@ mn_up	ldx MSEL		; OPTION: up, round to the bottom
 	dex
 	bpl mn_set
 	ldx MNT
+	inx
 mn_set	stx MSEL
 	jmp menu
 
-; mgo: run the highlighted line (the last one: the results).
+; mgo: run the highlighted line: a test, all of them, or the results.
 mgo	jsr waitrel
 	lda MSEL
 	cmp MNT
 	bcc mr_t
+	beq mr_all
 	jmp final
+mr_all	inc MMODE		; all, from the first
+	lda #0
 mr_t	asl
 	sta TIDX
 	jsr tnextv
@@ -432,8 +461,24 @@ md_f	pha
 md_nx	ldx CNT
 	inx
 	bne md_lp
-md_res	ldx CNT			; the last line: the results
-	stx MNT
+md_res	lda #<s_mall		; then ALL and the results
+	ldy #>s_mall
+	jsr puts
+	lda #0
+	sta INV
+	ldx MNT
+	inx
+	cpx MSEL
+	bne md_r
+	lda #$80
+	sta INV
+md_r	txa
+	clc
+	adc #4
+	ldx #0
+	jsr at
+	lda #0
+	jsr putc
 	lda #<s_mres
 	ldy #>s_mres
 	jsr puts
@@ -441,19 +486,15 @@ md_res	ldx CNT			; the last line: the results
 	sta INV
 	PRINT 18, 0, s_m1
 	PRINT 19, 0, s_m2
-	lda MIDLE
-	ora MIDLE+1
-	beq md_x
-	PRINT 21, 0, s_m3
-md_x	rts
+	rts
 
 kdigit	.byte $1F, $1E, $1A, $18, $1D, $1B, $33	; KBCODEs of 1-7
 s_hmenu	dta d'MENU',$FF
 s_notrun dta d'-',$FF
+s_mall	dta d'ALL OF THEM, IN ORDER',$FF
 s_mres	dta d'RESULTS AND THE FINAL CODE',$FF
 s_m1	dta d'START=RUN  SELECT=DOWN  OPTION=UP',$FF
 s_m2	dta d'OR PRESS 1-7 TO RUN THAT TEST',$FF
-s_m3	dta d'NOTHING PRESSED FOR 10 S: RUN THEM ALL',$FF
 s_toggle3 dta d'START=MENU  SELECT=REPLAY  OPTION=FLASH',$FF
 	.endif
 
@@ -513,7 +554,35 @@ rz_f	pha
 rz_n	ldx CNT
 	inx
 	bne rz_lp
-rz_end	.ifdef WANT_ROM
+rz_end	.ifdef CHAIN
+	lda CNT			; the 48k tape: RAM from stages 1-2, as test 8
+	clc
+	adc #4
+	ldx #0
+	jsr at
+	lda #<s_t8
+	ldy #>s_t8
+	jsr puts
+	lda CNT
+	clc
+	adc #4
+	ldx #18
+	jsr at
+	lda BADMASK+8
+	bne rz_rf
+	lda #<s_pass
+	ldy #>s_pass
+	jsr puts
+	jmp rz_rd
+rz_rf	pha
+	lda #<s_fail
+	ldy #>s_fail
+	jsr puts
+	pla
+	jsr putitems
+rz_rd	inc CNT
+	.endif
+	.ifdef WANT_ROM
 	lda CNT
 	clc
 	adc #5
@@ -556,6 +625,9 @@ s_t4	dta d'4 POKEY',$FF
 s_t5	dta d'5 JOYSTICKS',$FF
 s_t6	dta d'6 PADDLES',$FF
 s_t7	dta d'7 GTIA',$FF
+	.ifdef CHAIN
+s_t8	dta d'8 RAM, BANKS',$FF
+	.endif
 s_test	dta d'TEST ',$FF
 s_pass	dta d'PASS',$FF
 s_fail	dta d'FAIL'*,$FF

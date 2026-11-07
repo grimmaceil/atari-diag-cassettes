@@ -1,4 +1,4 @@
-; Stage 2 loader, shared by the two-stage tapes. Needs from the stage:
+; Next-stage loader, shared by the multi-stage tapes. Needs from the stage:
 ; results (redraws its text screen with the L2MSG line), final (the final
 ; result), the s_l2* strings, s_l2load. NORAMCHK: don't require RAM test
 ; results for banks 1-2 (tape 3 has none; its BADMASK holds test results).
@@ -10,8 +10,11 @@
 ; interrupt handlers must run while it loads: VBI for SIO's gap and timeout
 ; timers, IRQ for the serial input. Low RAM, where the OS keeps its state,
 ; has passed and was restored, so that is safe now.
-; It loads at S2LOAD, into bank 1 RAM this stage has just tested.
-S2LOAD	= $2000
+; It loads at LDTO, into RAM this stage has just tested: $2000 (bank 1) for
+; tape 1's stage 2; the 48k tape's stage 2 sets $4000 (bank 2) for stage 3.
+	.ifndef LDTO
+LDTO	= $2000
+	.endif
 DDEVIC	= $0300		; SIO device control block, $0300-$030B
 SIOV	= $E459
 CASBUF	= $03FD		; record as read: $55 $55, type, 128 data bytes
@@ -28,7 +31,7 @@ ATRACT	= $4D
 load2	lda #0			; from here on a result is final
 	sta CONTVEC+1
 	lda RAMTOP
-	cmp #>S2LOAD+$20	; stage 2 needs $2000-$3FFF
+	cmp #>LDTO+$20	; the next stage needs 8K from LDTO
 	bcs l2_ram
 	lda #<s_l2_8k
 	ldy #>s_l2_8k
@@ -77,17 +80,24 @@ l2_dma	sta SDMCTL
 	sta NMIEN
 	cli
 
-	lda #<S2LOAD
+	lda #<LDTO
 	sta PTR
-	lda #>S2LOAD
+	lda #>LDTO
 	sta PTR+1
 	jsr rdrec		; first record: the stage 2 header
+	.ifdef SKIPEOF
+	bcc l2_hd		; SKIPEOF: this stage was loaded by a loader, not
+	cmp #1			; the OS, so its own EOF record is still ahead
+	bne l2_sio
+	jsr rdrec
+l2_hd
+	.endif
 	bcs l2_sio
-	lda CASDAT+2		; load address must be S2LOAD
-	cmp #<S2LOAD
+	lda CASDAT+2		; load address must be LDTO
+	cmp #<LDTO
 	bne l2_hdr
 	lda CASDAT+3
-	cmp #>S2LOAD
+	cmp #>LDTO
 	bne l2_hdr
 	lda CASDAT+1		; records: even (whole pages), not zero
 	beq l2_hdr
@@ -96,7 +106,7 @@ l2_dma	sta SDMCTL
 	bcs l2_hdr
 	sta S2PAGES
 	clc			; its end page, plus a page of BSS
-	adc #>S2LOAD+1
+	adc #>LDTO+1
 	cmp RAMTOP
 	beq l2_fits
 	bcs l2_big
@@ -127,7 +137,7 @@ l2_next	dec S2LEFT
 l2_done	jsr l2stop
 	jsr s2sum
 	bne l2_bsum
-	jmp S2LOAD+6
+	jmp LDTO+6
 
 l2_big	lda #<s_l2_big
 	ldy #>s_l2_big
@@ -213,7 +223,7 @@ s2sum	lda #0
 	sta SUM
 	sta SUM+1
 	sta PTR
-	lda #>S2LOAD
+	lda #>LDTO
 	sta PTR+1
 	ldx S2PAGES
 	ldy #0

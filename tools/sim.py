@@ -83,6 +83,10 @@ class Atari:
                     v &= ~bit
                 return v
             if a == 0xD209:      # KBCODE: the last key pressed
+                ln = self.line
+                last = [e for e in self.presses if e[2] == 'KB' and e[0] <= ln]
+                if last:
+                    self.kbcode = max(last)[3]
                 return self.kbcode
             if a == 0xD20A:
                 return random.randrange(256)
@@ -95,7 +99,9 @@ class Atari:
             if a == 0xD20E:      # IRQST: bit 6 latches a keypress while the
                 ln = self.line   # keyboard IRQ is enabled (masked or not),
                 v = 0xFF         # bit 7 BREAK, bit 0 timer 1 (~4 ms after STIMER)
-                if self.irqen & 0x40 and any(self.irqen_line <= s <= ln for s, e in self.keys):
+                if self.irqen & 0x40 and (any(self.irqen_line <= s <= ln for s, e in self.keys)
+                                          or any(self.irqen_line <= e[0] <= ln
+                                                 for e in self.presses if e[2] == 'KB')):
                     v &= ~0x40
                 if self.irqen & 0x80 and any(self.irqen_line <= e[0] <= ln
                                              for e in self.presses if e[2] == 'BREAK'):
@@ -346,6 +352,9 @@ KEYCODES = [0x00, 0x01, 0x02, 0x05, 0x06, 0x07, 0x08, 0x0A, 0x0B, 0x0C, 0x0D, 0x
             0x3A, 0x3C, 0x3D, 0x3E, 0x3F]   # every key all machines have
 
 
+WALK = [0x1F, 0x1E, 0x1A, 0x1D, 0x1B, 0x18, 0x33]   # keys 1 2 3 5 6 4 7: the menu order
+
+
 class Auto:
     """Answers tape 3's prompts as a person would, from the screen text.
     deny: prompt words to answer No to; skip: keys to leave unpressed."""
@@ -354,16 +363,21 @@ class Auto:
 
     def __init__(self, hw, deny, skip, menuwalk=False):
         self.hw, self.deny, self.skip, self.seen = hw, deny, skip, set()
-        self.menuwalk = menuwalk
+        self.menuwalk, self.walk = menuwalk, 0
 
     def check(self):
         text = self.hw.screen()
-        if self.menuwalk and 'SELECT=DOWN' in text:    # the 16k/48k menu: START
+        if 'SELECT=DOWN' in text:            # the 16k/48k menu
             sel = [l for l in text.splitlines() if any(c.islower() for c in l[3:])]
-            sig = 'MENU|' + '|'.join(sel)              # runs the highlighted test
+            sig = 'MENU|' + '|'.join(sel)
             if sig not in self.seen:
                 self.seen.add(sig)
-                self.hw.press(self.hw.line + int(1000 * LINES_PER_MS), 'CON', 1)
+                when = self.hw.line + int(1000 * LINES_PER_MS)
+                if self.menuwalk and self.walk < len(WALK):   # a test by its key
+                    self.hw.press(when, 'KB', WALK[self.walk])
+                    self.walk += 1
+                else:                         # START: ALL at first, then (walk)
+                    self.hw.press(when, 'CON', 1)            # the results
             return
         if 'START=GO ON' in text:    # a failed test's code: go on (a press only
             ln = self.hw.line        # counts in a pause, so keep pressing)
@@ -471,7 +485,7 @@ def main():
     ap.add_argument('--deny', default='', help='with --auto: answer No where the screen shows these (comma list)')
     ap.add_argument('--skip', type=int, default=0, help='with --auto: leave this many keys unpressed')
     ap.add_argument('--menuwalk', action='store_true',
-                    help='with --auto: press START at each menu (one test at a time)')
+                    help='with --auto: run the menu tests one at a time by their keys')
     ap.add_argument('--peek', help='LO-HI: print these BSS bytes (hex offsets) at the end')
     ap.add_argument('--forge', help='ADDR=CRC32,...: stand-in 400/800 OS chips with these CRCs')
     ap.add_argument('-v', action='store_true')

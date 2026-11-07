@@ -23,8 +23,10 @@ SHARE = Path('//TRUENAS/Media/games/ATARI800')   # MiSTer Atari800 core's folder
 # Each tape: source dir, name, stages (first = boot), defines. A later stage
 # is told where the boot stage keeps its BSS and where its own test area ends.
 # The system tapes are one main.asm with the tests picked by WANT_* defines.
-# Every set shares tape 1: its stage 2 (16K and up) relocates the RAM test
-# to the RAM stage 1 sat in, and tests the XL/XE extras where it finds them.
+# The 400 and 16k sets share tape 1: its stage 2 (16K and up) relocates the
+# RAM test to the RAM stage 1 sat in, and tests the XL/XE extras where it
+# finds them. The 48k set is one tape: the same two RAM stages (CHAIN3: stage
+# 2 then loads stage 3) and the system tests as stage 3 (CHAIN), at $4000.
 ALL7 = dict(WANT_ROM=1, WANT_KB=1, WANT_CON=1, WANT_JOY=1, WANT_PAD=1,
             WANT_POK=1, WANT_GTIA=1)
 S400 = {'SETNO': 0}
@@ -39,9 +41,8 @@ TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
          ('tape1', 'diag-16k-01-ram', ['main.asm', 'stage2.asm'], {}),
          ('system', 'diag-16k-02-system', ['main.asm'],
           dict(ALL7, SETNO=1, TAPENO=2, MENU=1, BIGSTAGE=1)),
-         ('tape1', 'diag-48k-01-ram', ['main.asm', 'stage2.asm'], {}),
-         ('system', 'diag-48k-02-system', ['main.asm'],
-          dict(ALL7, SETNO=2, TAPENO=2, MENU=1, BIGSTAGE=1)),
+         ('tape1', 'diag-48k-xl-xe', ['main.asm', 'stage2.asm', 'system/main.asm'],
+          dict(ALL7, SETNO=2, CHAIN3=1, CHAIN=1, MENU=1)),
          ('tape2', 'diag-burnin', ['main.asm'], {})]
 
 
@@ -66,10 +67,16 @@ def build(src, name, stages, defines, label):
     out = BUILD / name
     mads(src, stages[0], out, defines)
     s1 = labels(f'{out}.lab')
-    nexts = []
+    prev, nexts = s1, []
     for k, asm in enumerate(stages[1:], 2):
-        d = dict(defines, S1BSS=f"${s1['BSS']:04X}", S1TSTART=f"${s1['TSTART']:02X}")
-        mads(src, asm, Path(f'{out}.s{k}'), d)
+        # 'dir/file.asm' takes a stage from another source dir (the 48k tape's
+        # stage 3 is the system tests). PREVBSS: the stage before, whose
+        # results it takes over.
+        sdir, sasm = asm.split('/') if '/' in asm else (src, asm)
+        d = dict(defines, S1BSS=f"${s1['BSS']:04X}", S1TSTART=f"${s1['TSTART']:02X}",
+                 PREVBSS=f"${prev['BSS']:04X}")
+        mads(sdir, sasm, Path(f'{out}.s{k}'), d)
+        prev = labels(f'{out}.s{k}.lab')
         nexts += ['--next', f'{out}.s{k}.bin']
     subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
                     '--boot', f'{out}.bin', f'{out}.lab', *nexts, '--name', label],

@@ -313,8 +313,8 @@ the machine can't hold, and it loads in as few steps as the RAM allows.
 | Set | For | Layout |
 |---|---|---|
 | `diag-400-*` (built) | 8K 400 | Each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. The tests are split logically and run progressively: 01 RAM, 02 ROMs (test 1), 03 input (tests 2-3), 04 ports (5-6), 05 sound and video (4, 7). Later tapes rely only on what earlier ones proved: the Y/N answers come from keys already tested. |
-| `diag-16k-*` (built) | 16K-32K 400/800 | 01 RAM (tape 1: stage 2 relocates to test the RAM stage 1 sat in), 02 system: all seven tests in one 68-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; idle 10 s at power-on runs all). |
-| `diag-48k-*` (built) | 48K 800, XL/XE | As 16k for now. The XL/XE extras (RAM under the OS, 130XE banks, BASIC and self-test ROM, two joystick ports, cartridge detection) are detected at run time in both sets. This set takes the RAM-hungry tests in the list below. |
+| `diag-16k-*` (built) | 16K-32K 400/800 | 01 RAM (tape 1: stage 2 relocates to test the RAM stage 1 sat in), 02 system: all seven tests in one 68-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; ALL runs every test). |
+| `diag-48k-xl-xe` (built) | 48K 800, XL/XE (32K and up) | One tape, three stages. Stage 1 is the RAM test (tape 1's). Stage 2 tests the RAM stage 1 sat in, the RAM under the OS and the 130XE banks (tape 1's, built with CHAIN3), then loads stage 3 at $4000 if banks 1-2 passed. Stage 3 is the system tests with the menu (CHAIN); RAM faults are carried over as test 8, item = bank. Bank 1 or 2 bad, or under 32K: it stops and names the set to use instead. The 400 set is the fallback for every machine. |
 | `diag-burnin` (built) | all | One version. It sizes the RAM itself. |
 
 The system tapes are built from one `src/system/main.asm`, with a file per
@@ -326,9 +326,17 @@ Every set still tests the RAM its own code occupies. On the 400 that means
 relocating a small march into the screen block with the screen off, and
 reporting by beeps.
 
-Test menu (16k/48k): START runs the highlighted test, SELECT moves to the
-next, OPTION to the previous. Left alone for 10 s, it runs all of them in
-order, as now.
+Test menu (16k/48k): START runs the highlighted line, SELECT moves down,
+OPTION moves up, and 1-7 jump to a test. "ALL OF THEM, IN ORDER" is
+highlighted at power-on. After a test the next one is highlighted.
+
+No timeouts after the first screen check (Mike, 2026-11-07: they only
+annoy). Every question waits for its answer:
+- the border is purple while a question waits
+- a sound being asked about repeats until the answer
+- a key pressed during the busy console-speaker tone still counts, through
+  the POKEY IRQST latch
+- tests that end with START also end with any key, in case START is dead.
 
 ROM test: CRC32 matched against section 10a. On the 400/800 each OS chip is
 identified on its own, so a repaired board with mixed revisions shows which

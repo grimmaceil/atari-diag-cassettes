@@ -19,6 +19,11 @@
 ; fails shows which items failed and plays A = test number, B = item, until
 ; START, a key or fire; SELECT replays it, OPTION switches to full-screen
 ; flashes. After the last test, the tape's results and the final code.
+;
+; CHAIN (the 48k tape): not a boot file but stage 3 of tape 1, loaded at $4000
+; by its stage 2 once the RAM it needs has passed. It takes over stage 2's
+; results; their RAM faults become test 8, item = bank, on the results
+; screen and in the final code. Built with -d:PREVBSS=... (stage 2's BSS).
 
 	icl '../common/hw.asm'
 	icl '../common/vars.asm'
@@ -27,9 +32,53 @@
 QUICKSCR = 1			; display.asm: quick screen-block test
 
 	opt h-
+	.ifdef CHAIN
+LOAD	= $4000
+	.else
 LOAD	= $0800
+	.endif
 	org LOAD
 
+	.ifdef CHAIN
+; Same header layout as a boot file: the loader checks the record count and
+; load address, then jumps to LOAD+6.
+	.byte 0
+	.byte NREC
+	.word LOAD
+	.word 0
+
+	sei
+	cld
+	ldx #$FF
+	txs
+	ldx #0			; take over stage 2's results
+ch_tk	lda PREVBSS,x
+	sta BSS,x
+	inx
+	bne ch_tk
+	lda #0			; RAM faults (banks 1-8; the loader area is
+	sta MTMP		; bank 1) into test 8, item = bank
+	ldx #8
+ch_rm	lda BADMASK,x
+	beq ch_rn
+	lda bitn-1,x
+	ora MTMP
+	sta MTMP
+	lda #0
+	sta BADMASK,x
+ch_rn	dex
+	bne ch_rm
+	lda BADMASK+LDRIDX
+	beq ch_r9
+	lda #1
+	ora MTMP
+	sta MTMP
+	lda #0
+	sta BADMASK+LDRIDX
+ch_r9	lda MTMP
+	sta BADMASK+8
+	jmp trun
+	.else
 ; Cassette boot header. The OS reads NREC records to LOAD, then JSRs LOAD+6.
 	.byte 0
 	.byte NREC
@@ -41,6 +90,7 @@ LOAD	= $0800
 	jsr detect
 	jsr dprereq
 	jmp trun
+	.endif
 
 ; The tests, in running order, then final. ttests: their numbers, 0 ends.
 tlist
@@ -113,6 +163,7 @@ ttests
 	icl 't_gtia.asm'
 	.endif
 
+	.ifndef CHAIN
 	icl '../common/display.asm'
 
 init_rts rts
@@ -122,29 +173,33 @@ pats	.byte $00,$FF,$55,$AA
 	.byte $01,$02,$04,$08,$10,$20,$40,$80
 	.byte $FE,$FD,$FB,$F7,$EF,$DF,$BF,$7F
 NPAT	= *-pats
+	.endif
 
 	icl '../common/report.asm'
 	icl '../common/screen.asm'
 	icl '../common/info.asm'
 	icl 'common.asm'
 
-; The header bar: " A8 DIAG 400 TAPE 3 " (SETNO 0 = 400, 1 = 16K, 2 = 48K).
+; The header bar: " A8 DIAG 400 TAPE 3 " (SETNO 0 = 400, 1 = 16K), or the
+; 48k tape's own name (SETNO 2).
+	.if SETNO=2
+s_hpre	dta d' A8 DIAG 48K XL/XE  ',$FF
+	.else
 s_hpre	dta d' A8 DIAG '
 	.if SETNO=0
 	dta d'400'
-	.elseif SETNO=1
-	dta d'16K'
 	.else
-	dta d'48K'
+	dta d'16K'
 	.endif
 	dta d' TAPE ',[TAPENO+$10],d' ',$FF
+	.endif
 
 ; Pad to a whole page; the last two bytes hold the image sum (mkcas.py).
 PADTO	= [[*+2+$FF]/$100]*$100
 	.if PADTO-*-2>0
 	:[PADTO-*-2] .byte 0
 	.endif
-CKSUM	.word 0
+CKSUM	.word 0			; (as stage 3: the loader's plain sum)
 IMGEND
 NREC	= [IMGEND-LOAD]/128
 BSS	= IMGEND

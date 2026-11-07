@@ -1,6 +1,7 @@
 ; Test 3: console keys and the speaker.
-;   items 1-3: START, SELECT, OPTION not seen within 30 s
-;   item 4: the speaker click not heard
+;   items 1-3: START, SELECT, OPTION not seen (it waits for all three, or for
+;              a keyboard key when one of them is dead)
+;   item 4: the speaker tone not heard (it repeats until the answer)
 CONSEEN	= TSCR+$00		; console keys seen (CONSOL bits, 1 = seen)
 
 t_con	lda #3
@@ -9,11 +10,8 @@ t_con	lda #3
 	ldy #>s_t3
 	jsr tpage
 	PRINT 5, 0, s_con1
+	PRINT 6, 0, s_con2
 	PRINT 8, 0, s_cons
-	lda #<[30*60]
-	sta RTIME
-	lda #>[30*60]
-	sta RTIME+1
 	lda #0
 	sta CONSEEN
 	jsr waitrel
@@ -40,24 +38,17 @@ co_3	lda CONSEEN
 co_t	lda CONSEEN
 	cmp #7
 	beq co_spk
-	lda RTIME
-	bne co_dec
-	dec RTIME+1
-co_dec	dec RTIME
-	lda RTIME
-	ora RTIME+1
+	lda SKSTAT		; a keyboard key: one of them is dead
+	and #4
 	bne co_lp
 co_spk	lda CONSEEN		; the keys never seen are items 1-3
 	eor #7
 	sta BADMASK+3
 	jsr waitrel
 	PRINT 11, 0, s_spk
-	lda #$08		; 1.5 s of console speaker tone
-	sta SPKMASK
-	WAITMS 1500
-	lda #0
-	sta SPKMASK
 	PRINT 12, 0, s_heard
+	lda #2			; the speaker tone, over and over
+	sta YNSND
 	jsr yesno
 	bcs co_end
 	lda #8
@@ -84,5 +75,6 @@ lc_lp	lda (CUR),y
 lc_x	rts
 
 s_con1	dta d'PRESS START, SELECT AND OPTION.',$FF
+s_con2	dta d'(ONE DEAD? PRESS ANY KEY TO GO ON.)',$FF
 s_cons	dta d'START  SELECT  OPTION',$FF
 s_spk	dta d'LISTEN: A TONE FROM THE CONSOLE SPEAKER',$FF

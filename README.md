@@ -6,26 +6,41 @@ useful before the video works. A text screen comes in only once the display
 hardware checks out.
 
 There are three sets, one per RAM size, so a tape never needs more RAM than
-the machine has, and bigger machines load in fewer steps:
+the machine has, and bigger machines load in fewer steps. The 400 set is also
+the fallback for any machine: it needs only the first 8K to work.
 
 | Set | For | Tapes |
 |---|---|---|
 | `diag-400-*` | 8K 400 | 01 RAM, then four small tapes that each fit 8K by themselves: 02 ROMs, 03 input, 04 ports, 05 sound and video |
 | `diag-16k-*` | 16K-32K 400/800 | 01 RAM, 02 system: all seven tests in one load, with a menu |
-| `diag-48k-*` | 48K 800, XL/XE | as 16k. This set is where the RAM-hungry graphics and sound tests will go. |
+| `diag-48k-xl-xe` | 48K 800, XL/XE (32K and up) | one tape, three stages: RAM, the rest of RAM (the RAM the first stage sat in, the RAM under the OS, the 130XE banks), then the system tests with the menu |
 | `diag-burnin` | all | one version |
+
+The 48k tape works out each next step itself:
+- All passed: it goes on by itself.
+- A RAM fault where the system tests don't load: its code plays, then START
+  goes on, and the fault shows again as test 8 (item = bank) in the results
+  and the final code.
+- Bank 1 or 2 bad, or less than 32K: it stops, and says which set to use.
 
 The tapes of a set run in order. Each one relies only on what the earlier
 ones proved; for example, the keyboard is tested before any test asks a Y/N
 question.
 
-The system tape's menu (16k/48k):
-- START runs the highlighted test, SELECT moves down, OPTION moves up, and the
-  keys 1-7 run that test.
-- After a test the menu comes back with the next test highlighted, so
+The system tests' menu (16k, 48k):
+- START runs the highlighted line, SELECT moves down, OPTION moves up, and
+  the keys 1-7 run that test.
+- At power-on "ALL OF THEM, IN ORDER" is highlighted, so one START runs
+  everything, then shows the results and plays the final code.
+- After a single test the menu comes back with the next test highlighted, so
   pressing START again and again walks through them.
-- Left alone for 10 s at power-on, it runs them all in order, then shows the
-  results and plays the final code.
+
+Past the first screen check nothing times out: every question waits for its
+answer. While a question waits the border is purple, and a sound being asked
+about (a POKEY voice, the console speaker) repeats until the answer, so the
+test still works when the picture doesn't. A test that ends with START
+(joysticks, paddles, console keys) also ends with any keyboard key, in case
+START is the broken part.
 
 The 400 set, tape by tape:
 

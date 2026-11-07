@@ -30,9 +30,7 @@ gt_v	pha
 	tay
 	pla
 	jsr puts
-gt_g	lda #30
-	jsr settime
-	jsr waitrel
+gt_g	jsr waitrel
 gt_lp	lda VCOUNT		; luminance: 8 steps of 8 lines
 	cmp #[32+GL_ROW*8]/2
 	bne gt_lp
@@ -87,8 +85,6 @@ gt_c	lda CONSOL
 	bcc gt_yes
 	lsr
 	bcc gt_no
-	jsr rtick
-	beq gt_no
 	jmp gt_lp
 gt_no	lda #1
 	sta BADMASK+7

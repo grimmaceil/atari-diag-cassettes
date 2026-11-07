@@ -11,6 +11,12 @@
 ;
 ; Then the final code: the loader area counts as bank 1 for the beeps.
 ; Built with -d:S1BSS=... -d:S1TSTART=... from stage 1's label table.
+;
+; CHAIN3 (the 48k tape): then stage 3, the system tests, loads at $4000 if
+; the RAM it needs passed (banks 1 and 2: the loader checks). All passed:
+; it goes on by itself after the jingle. A fault elsewhere: its code plays,
+; and START goes on. Banks 1-2 bad, or under 32K: the tape ends here and
+; says which set to use instead.
 
 	icl '../common/hw.asm'
 	icl '../common/vars.asm'
@@ -40,7 +46,15 @@ tk_lp	lda S1BSS,x
 	sta BSS,x
 	inx
 	bne tk_lp
+	.ifdef CHAIN3
+	lda #0			; stage 1's load may have needed a retry: its
+	sta L2STAT		; SIO status is not about stage 3
+	lda #<load2		; a press (or a pass) goes on to stage 3
+	sta CONTVEC
+	lda #>load2
+	.else
 	lda #0			; this stage's result is the tape's last
+	.endif
 	sta CONTVEC+1
 
 	lda #C_YELLOW
@@ -96,6 +110,23 @@ fin_lp	lda BADMASK,x
 fin_bad	jmp report
 
 redraw	= summary		; scrtoggle's text screen
+
+	.ifdef CHAIN3
+LDTO	= $4000			; loader.asm: stage 3, in bank 2
+SKIPEOF	= 1			; loader.asm: stage 2's own EOF record comes first
+results	= summary		; loader.asm: its redraw, with the L2MSG line
+final	= fin			; and the tape's end when stage 3 can't load
+	icl '../common/loader.asm'
+; clrrow: blank row A.
+clrrow	ldx #0
+	jsr at
+	ldx #40
+	lda #0
+cr_lp	jsr putc
+	dex
+	bne cr_lp
+	rts
+	.endif
 
 ; Progress lines for xlram.asm.
 osprog	lda DISPOK
@@ -298,7 +329,26 @@ su_dd	lda #16
 	sta RROW
 	jsr faildetail
 	PRINT 21, 0, s_nextbad
-su_end	PRINT 23, 0, s_toggle2
+su_end
+	.ifdef CHAIN3
+	lda L2MSG+1		; why stage 3 didn't load
+	beq su_l2
+	lda #22
+	jsr clrrow
+	PRINT 22, 0, s_l2pre
+	lda L2MSG
+	ldy L2MSG+1
+	jsr puts
+	lda L2STAT
+	beq su_l2
+	jsr puthex
+su_l2	lda CONTVEC+1
+	beq su_t2
+	PRINT 23, 0, s_toggle
+	rts
+su_t2
+	.endif
+	PRINT 23, 0, s_toggle2
 	rts
 
 ; bankhi: A = bank-1 (0-3) -> A = its first page ($00/$40/$80/$C0).
@@ -380,15 +430,29 @@ s_tos	dta d'TESTING RAM UNDER THE OS ROM',$FF
 s_txe	dta d'TESTING 130XE BANKS',$FF
 s_nfail	dta d'FAILURES: ',$FF
 s_detail dta d'DETAIL:',$FF
+	.ifdef CHAIN3
+s_nextok dta d'ALL PASSED. THE LAST LINE: WHAT NEXT',$FF
+s_nextbad dta d'FIX THIS FIRST. THE LAST LINE: WHAT NEXT',$FF
+s_toggle dta d'START=GO ON  SELECT=REPLAY  OPTION=FLASH',$FF
+s_l2load dta d'LOADING THE SYSTEM TESTS, KEEP PLAYING',$FF
+s_l2pre	dta d'SYSTEM TESTS: ',$FF
+s_l2_8k	dta d'NEED 32K: USE THE 16K SET',$FF
+s_l2_bad dta d'BANK 1 BAD: USE THE 400 SET',$FF
+s_l2_big dta d'NEED BANK 2: USE 400 SET',$FF
+s_l2_sio dta d'ERROR $',$FF
+s_l2_hdr dta d'NOT ON TAPE',$FF
+s_l2_sum dta d'BAD CHECKSUM',$FF
+	.else
 s_nextok dta d'ALL PASSED. NEXT: TAPE 2 (BURN-IN)',$FF
 s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
+	.endif
 s_toggle2 dta d'SELECT=REPLAY  OPTION=FULL-SCREEN FLASH',$FF
 
 PADTO	= [[*+2+$FF]/$100]*$100
 	.if PADTO-*-2>0
 	:[PADTO-*-2] .byte 0
 	.endif
-S2SUM	.word 0			; mkcas.py: sum of every byte before this
+IMGSUM	.word 0			; mkcas.py: sum of every byte before this
 IMGEND
 NREC	= [IMGEND-S2LOAD]/128
 BSS	= IMGEND

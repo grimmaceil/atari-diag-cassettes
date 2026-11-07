@@ -4,7 +4,8 @@
 ;   which proves the scan works. One that doesn't fails item = paddle.
 ;   live: value bar, min/max seen (a full turn reaches about 1 and 228),
 ;   jitter (spread over 16 frames: big with the knob still = dirty pot),
-;   the paddle trigger. SELECT: fast scan (SKCTL bit 2). START ends it.
+;   the paddle trigger. SELECT: fast scan (SKCTL bit 2). START or a
+;   keyboard key ends it.
 PCUR	= TSCR+$00		; 8: paddle values now
 PMIN	= TSCR+$08		; 8
 PMAX	= TSCR+$10		; 8
@@ -102,6 +103,9 @@ pd_j1	sta PJIT,x
 	dex
 	bpl pd_j
 pd_sh	jsr potshow
+	lda SKSTAT		; a key ends it too (START may be dead)
+	and #4
+	beq pd_end
 	lda CONSOL
 	lsr
 	bcc pd_end
@@ -259,6 +263,6 @@ p3_o	pha
 
 s_pd1	dta d'UNPLUG ALL PADDLES, THEN PRESS START',$FF
 s_pd2	dta d'(SELECT SKIPS THE OPEN-INPUT CHECK)',$FF
-s_pd3	dta d'TURN EACH. SELECT=FAST SCAN. START ENDS.',$FF
+s_pd3	dta d'TURN EACH. SELECT=FAST. START/KEY ENDS.',$FF
 s_pdh	dta d'                       VAL MIN MAX JIT',$FF
 s_fast	dta d'FAST SCAN'*,$FF

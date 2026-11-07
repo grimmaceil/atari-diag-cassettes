@@ -256,15 +256,17 @@ br_cmp	lda $A000,x
 	dex
 	bpl br_cmp
 	lda $A000		; the same both ways: RAM (a 1200XL), or a
-	eor #$FF		; cartridge, which holds $A000-$BFFF either way
-	sta $A000		; and doesn't take a write
-	cmp $A000
+	sta MTMP		; cartridge, which holds $A000-$BFFF either way.
+	eor #$FF		; A write changes RAM, even RAM with bad bits,
+	sta $A000		; and never changes a ROM
+	lda $A000
+	cmp MTMP
 	php
-	eor #$FF
+	lda MTMP
 	sta $A000		; (RAM: put it back)
 	plp
 	clc
-	beq br_out
+	bne br_out
 	lda #8
 	ora ROMHAVE
 	sta ROMHAVE

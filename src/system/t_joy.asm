@@ -1,6 +1,6 @@
 ; Test 5: joysticks and triggers, live: a direction or fire shows inverse
 ; while it is active. One already active at the start is stuck: item = port.
-; START ends it.
+; START ends it, or a keyboard key (in case START is dead).
 JX	= TSCR+$00		; jshow: label being printed
 JBITS	= TSCR+$01		; jshow: the port's active bits
 
@@ -31,10 +31,13 @@ jy_port	stx CNT
 	inx
 	cpx NPORT
 	bne jy_port
-	lda CONSOL
+	lda CONSOL		; START ends it, or a key if START is dead
 	lsr
-	bcs jy_lp
-	jsr waitrel
+	bcc jy_end
+	lda SKSTAT
+	and #4
+	bne jy_lp
+jy_end	jsr waitrel
 	jmp tend
 
 ; jread: port X now: bits 0-3 up, down, left, right, bit 4 fire (1 =
@@ -108,7 +111,7 @@ js_n	lda JX
 js_x	rts
 jlabels	.word s_up, s_down, s_left, s_right, s_fire
 
-s_joy1	dta d'MOVE EACH STICK, PRESS FIRE. START ENDS.',$FF
+s_joy1	dta d'MOVE EACH STICK, FIRE. START/A KEY ENDS',$FF
 s_stick	dta d'STICK ',$FF
 s_up	dta d'UP',$FF
 s_down	dta d'DOWN',$FF

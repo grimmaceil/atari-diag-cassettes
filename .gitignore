@@ -2,7 +2,7 @@
 build/*
 !build/diag-400-0*.cas
 !build/diag-16k-0*.cas
-!build/diag-48k-0*.cas
+!build/diag-48k-xl-xe*.cas
 !build/diag-burnin.cas
 build/*FAULT*
 
