@@ -293,6 +293,11 @@ BASIC, 8K at $A000:
 | B | F0202FB3 | 600XL, 800XL (MAME CO60302A) |
 | C | 7D684184 | 65XE, 130XE, 800XE (MAME CO24947A) |
 | Arabic | C899F4D6 | MAME only (a65xea) |
+| (rev A misloaded) | CCF05648 | Rev A loaded from a `.car` file as a raw 8K ROM, as the MiSTer core does when a `.car` is given as the BASIC ROM. The 16-byte CART header wraps, so BASIC sits 16 bytes on (verified on Mike's file, 2026-11-07). Shown as "A, .CAR MISLOAD". |
+
+BASIC or a cartridge that's missing or unknown is never a fault: the line
+says NONE or NOT IN THE TABLE. On the 400/800 it's labelled CARTRIDGE: BASIC
+was always a cartridge there. The 1200XL has no BASIC.
 
 ## 11. To verify / open items
 

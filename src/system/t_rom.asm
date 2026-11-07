@@ -452,8 +452,26 @@ ri_xl	ldx #0
 	jsr romline
 ri_bas	lda ROMHAVE
 	and #2
-	beq ri_ch
-	ldx #3			; BASCRC is OSCRC+12 and BASID is OSID+3: slot 3
+	bne ri_have
+	lda CNT			; none: say so (not a fault: a 400/800 without a
+	ldx #0			; cartridge, a 1200XL, BASIC switched off)
+	jsr at
+	lda #<s_rcart
+	ldy #>s_rcart
+	ldx MACHINE
+	beq ri_n
+	lda #<s_rbas
+	ldy #>s_rbas
+ri_n	jsr puts
+	lda CNT
+	ldx #11
+	jsr at
+	lda #<s_none
+	ldy #>s_none
+	jsr puts
+	inc CNT
+	jmp ri_ch
+ri_have	ldx #3			; BASCRC is OSCRC+12 and BASID is OSID+3: slot 3
 	lda ROMHAVE
 	and #8
 	beq ri_b
@@ -486,8 +504,12 @@ romline	stx MTMP
 	lda OSID,x
 	cmp #$FF
 	bne rl_k
-	lda #<s_unk
-	ldy #>s_unk
+	lda #<s_unk		; an unknown OS is a fault (inverse); an unknown
+	ldy #>s_unk		; BASIC or cartridge isn't (any cartridge will do)
+	cpx #3
+	bne rl_p
+	lda #<s_unkb
+	ldy #>s_unkb
 	bne rl_p
 rl_k	asl
 	tax
@@ -584,7 +606,7 @@ tab_e0h	.byte 6
 	.byte 8
 	.dword $ACCF9678
 	.byte 11
-tab_bas	.byte 4
+tab_bas	.byte 5
 	.dword $4BEC4DE2
 	.byte 15
 	.dword $F0202FB3
@@ -593,10 +615,12 @@ tab_bas	.byte 4
 	.byte 17
 	.dword $C899F4D6
 	.byte 18
+	.dword $CCF05648	; rev A loaded from a .car file as a raw ROM: its
+	.byte 19		; 16-byte header wraps, BASIC sits 16 bytes on
 
 romnames .word n_ab, n_antsc, n_bntsc, n_apal, n_r10, n_r11, n_r1, n_r2
 	.word n_r3, n_r3a, n_r3b, n_r4, n_r5, n_r59, n_r59a
-	.word n_basa, n_basb, n_basc, n_basar
+	.word n_basa, n_basb, n_basc, n_basar, n_bascar
 n_ab	dta d'REV A/B, ANY',$FF
 n_antsc	dta d'REV A NTSC',$FF
 n_bntsc	dta d'REV B NTSC',$FF
@@ -616,7 +640,10 @@ n_basa	dta d'BASIC REV A',$FF
 n_basb	dta d'BASIC REV B',$FF
 n_basc	dta d'BASIC REV C',$FF
 n_basar	dta d'BASIC ARABIC',$FF
+n_bascar dta d'A, .CAR MISLOAD',$FF
 s_unk	dta d'UNKNOWN'*,$FF
+s_unkb	dta d'NOT IN THE TABLE',$FF
+s_none	dta d'NONE',$FF
 s_rd8	dta d'OS $D800',$FF
 s_re0	dta d'OS $E000',$FF
 s_rf0	dta d'OS $F000',$FF
