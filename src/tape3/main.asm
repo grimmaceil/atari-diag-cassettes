@@ -19,6 +19,8 @@
 
 QUICKSCR = 1			; display.asm: quick screen-block test
 NORAMCHK = 1			; loader.asm: BADMASK holds test results here
+; ONESTAGE (build.py, the diag-400 set): an 8K 400 never loads stage 2, so
+; the loader and its messages are left out and test 3 ends the tape.
 
 ; Stage 1 data, in T3D (see t3common.asm).
 KBSEEN	= T3D+$08		; 8: KBCODEs seen, one bit each
@@ -29,18 +31,29 @@ CONSEEN	= T3D+$13		; console keys seen (CONSOL bits, 1 = seen)
 RTIME	= T3D+$14		; 2: frames left in a timed wait
 LCOL	= T3D+$16		; light: column of the character being lit
 LPMY	= T3D+$17		; light: P/M byte of the key's text row
+KACT	= T3D+$18		; offset of the key shown held ($FF: none)
+KCACT	= T3D+$19		; nonzero: CONTROL shown held
+SHACT	= T3D+$1A		; nonzero: SHIFT shown held
+BRKT	= T3D+$1B		; frames BREAK stays shown held (it has no key-up)
+LMODE	= T3D+$1C		; light: $80 held (inverse + P/M), 0 back to done
+LXS	= T3D+$1D		; light: caller's X
 
 KBROW	= 8			; first row of the on-screen keyboard
 
-; Lit keys get a color behind them from players and missiles: GR.0 gives
-; every character the same hue, but a player in front of the playfield
-; lends its color to the cell and the letters keep the text brightness.
+; Each key shows one of three states, told apart by brightness so they read
+; on a monochrome screen and without color vision:
+;   not pressed yet   light letters on black
+;   done              light letters on a mid green cell (P/M behind it)
+;   held now          the same cell inverted: bright cell, darker letters
+; GR.0 gives every character the same hue, but a player in front of the
+; playfield lends its color to the cell and the letters keep the text
+; brightness.
 ; Four quad-width players and four quad-width missiles are one bit per
 ; character column, so their memory is a color mask for the text screen.
 ; Double-line resolution, PM block at $0400: missiles $0580, players
 ; $0600-$07FF (free low RAM once the boot is done).
 PMPAGE	= $04
-C_LIT	= $C4			; green under a lit key
+C_LIT	= $C6			; behind a done key: luminance 6, between black and the text's 12
 
 	opt h-
 LOAD	= $0800
@@ -92,6 +105,13 @@ kb_rows	stx CNT
 	cpx #KBROWS
 	bne kb_rows
 	jsr pmon
+	PRINT KBROW+5, 0, s_kb2	; the legend, in its own states
+	lda #KL_DONE
+	jsr light
+	lda #KL_DONE
+	jsr unlit
+	lda #KL_HELD
+	jsr light
 
 kb_stk	lda SKSTAT		; stuck: a key or SHIFT down before any was asked
 	and #$0C
@@ -106,6 +126,8 @@ kb_go	lda #$80		; BREAK: latched by POKEY's IRQ status (masked)
 	sta IRQEN
 	lda #4
 	sta KBPREV
+	lda #$FF
+	sta KACT
 	jsr waitrel
 
 kb_lp	jsr vsync
@@ -117,20 +139,39 @@ kb_lp	jsr vsync
 	stx KBPREV
 	and #4
 	beq kb_sh
+	jsr kbup		; down or up, the key shown held is let go
 	txa
 	bne kb_sh		; that was a release
 	lda KBCODE
 	jsr kbdown
-kb_sh	lda SKSTAT		; SHIFT
+kb_sh	lda SKSTAT		; SHIFT: held while bit 3 = 0
 	and #8
+	bne kb_shup
+	lda SHACT
 	bne kb_br
+	inc SHACT
 	lda #1
 	jsr kbextra
 	lda #KO_SHIFT1
 	jsr light
 	lda #KO_SHIFT2
 	jsr light
-kb_br	lda IRQST		; BREAK
+	jmp kb_br
+kb_shup	lda SHACT
+	beq kb_br
+	lda #0
+	sta SHACT
+	lda #KO_SHIFT1
+	jsr unlit
+	lda #KO_SHIFT2
+	jsr unlit
+kb_br	lda BRKT		; BREAK: shown held for a moment
+	beq kb_brk
+	dec BRKT
+	bne kb_brk
+	lda #KO_BREAK
+	jsr unlit
+kb_brk	lda IRQST
 	bmi kb_st
 	lda #0
 	sta IRQEN
@@ -140,10 +181,14 @@ kb_br	lda IRQST		; BREAK
 	jsr kbextra
 	lda #KO_BREAK
 	jsr light
+	lda #20
+	sta BRKT
 	jsr click
 kb_st	lda CONSOL		; START ends it
 	lsr
-	bcs kb_lp
+	bcc kb_done
+	jmp kb_lp
+kb_done
 
 	lda #0
 	sta IRQEN
@@ -160,10 +205,26 @@ kb_end	lda #<t_con
 	sta NEXTVEC+1
 	jmp tresult
 
-; kbdown: KBCODE A was pressed: light it (and CONTROL), count it.
+; kbup: the key (and CONTROL) shown held goes back to done. Keeps X.
+kbup	lda KACT
+	cmp #$FF
+	beq ku_c
+	jsr unlit
+	lda #$FF
+	sta KACT
+ku_c	lda KCACT
+	beq ku_x
+	lda #0
+	sta KCACT
+	lda #KO_CTRL
+	jmp unlit
+ku_x	rts
+
+; kbdown: KBCODE A was pressed: show it (and CONTROL) held, count it.
 kbdown	pha
 	and #$80		; bit 7: CONTROL
 	beq kd_nc
+	sta KCACT
 	lda #2
 	jsr kbextra
 	lda #KO_CTRL
@@ -197,6 +258,7 @@ kd_lit	lda KBCODE
 	and #$3F
 	tax
 	lda kbofs,x
+	sta KACT
 	cmp #$FF
 	beq kd_x
 	jsr light
@@ -212,10 +274,16 @@ kbextra	tax
 	dec KBLEFT
 ke_x	rts
 
-; light: invert the key label at keyboard offset A, up to the next space,
-; and put the P/M color behind it.
-light	ldx DISPOK
+; light: show the key label at keyboard offset A (up to the next space) held:
+; inverse, with the P/M color behind it, which stays when unlit puts the
+; label back to normal video (done). Keeps X.
+light	ldy #$80
+	bne li_go
+unlit	ldy #0
+li_go	sty LMODE
+	ldy DISPOK
 	beq li_x
+	stx LXS
 	pha
 	ldx #16+KBROW*4		; P/M byte of text row 0 is 16 (scan line 32)
 li_dv	cmp #40			; offset -> row (X, 4 bytes a row) and column
@@ -237,15 +305,19 @@ li_rc	sta LCOL
 	sta CUR+1
 	ldy #0
 li_lp	lda (CUR),y
-	beq li_x
-	cmp #$FF
-	beq li_x
-	ora #$80
+	and #$7F
+	beq li_end		; the space after the label
+	cmp #$7F
+	beq li_end		; the row's $FF end
+	ora LMODE
 	sta (CUR),y
+	bit LMODE
+	bpl li_nx
 	jsr pmset
-	inc LCOL
+li_nx	inc LCOL
 	iny
 	bne li_lp
+li_end	ldx LXS
 li_x	rts
 
 ; pmset: set column LCOL's bit in the P/M mask for the 4 bytes (8 scan
@@ -430,9 +502,15 @@ co_spk	lda CONSEEN		; the keys never seen are items 1-3
 	lda #8
 	ora BADMASK+3
 	sta BADMASK+3
+	.ifdef ONESTAGE
+co_end	lda #<final
+	sta NEXTVEC
+	lda #>final
+	.else
 co_end	lda #<load2
 	sta NEXTVEC
 	lda #>load2
+	.endif
 	sta NEXTVEC+1
 	jmp tresult
 
@@ -507,6 +585,7 @@ rz_n	ldx CNT
 	inx
 	cpx #4
 	bne rz_lp
+	.ifndef ONESTAGE
 	lda L2MSG+1
 	beq rs_pr
 	PRINT 22, 0, s_l2pre
@@ -516,6 +595,7 @@ rz_n	ldx CNT
 	lda L2STAT
 	beq rs_pr
 	jsr puthex
+	.endif
 rs_pr	lda CONTVEC+1
 	beq rs_fin
 	PRINT 23, 0, s_toggle
@@ -536,7 +616,9 @@ fi_lp	lda BADMASK,x
 	jmp pass
 fi_bad	jmp report
 
+	.ifndef ONESTAGE
 	icl '../common/loader.asm'
+	.endif
 	icl '../common/display.asm'
 
 init_rts rts
@@ -557,6 +639,9 @@ kbrtab	.word kbrow0, kbrow1, kbrow2, kbrow3, kbrow4
 s_hpre	dta d' A8 DIAG  TAPE 3/3  ',$FF
 s_hres	dta d'RESULTS',$FF
 s_kb1	dta d'PRESS EVERY KEY. START ENDS THE TEST.',$FF
+s_kb2	dta d'NOT PRESSED YET  DONE  HELD',$FF
+KL_DONE	= 5*40+17		; legend words, as keyboard offsets
+KL_HELD	= 5*40+23
 s_stuck	dta d'A KEY WAS DOWN AT THE START: STUCK?'*,$FF
 s_left	dta d'KEYS LEFT ',$FF
 s_con1	dta d'PRESS START, SELECT AND OPTION.',$FF
@@ -564,6 +649,7 @@ s_cons	dta d'START  SELECT  OPTION',$FF
 s_spk	dta d'LISTEN: A TONE FROM THE CONSOLE SPEAKER',$FF
 s_heard	dta d'HEARD IT? Y/START = YES, N/SELECT = NO',$FF
 s_toggle2 dta d'SELECT=REPLAY  OPTION=FULL-SCREEN FLASH',$FF
+	.ifndef ONESTAGE
 s_l2load dta d'LOADING STAGE 2, KEEP TAPE PLAYING',$FF
 s_l2pre	dta d'STAGE 2: ',$FF
 s_l2_8k	dta d'NEEDS 16K, TAPE 3 ENDS HERE',$FF
@@ -572,6 +658,7 @@ s_l2_big dta d'TOO BIG FOR THE RAM',$FF
 s_l2_sio dta d'ERROR $',$FF
 s_l2_hdr dta d'NOT ON TAPE',$FF
 s_l2_sum dta d'BAD CHECKSUM',$FF
+	.endif
 
 ; Pad to a whole page; the last two bytes hold the image sum (mkcas.py).
 PADTO	= [[*+2+$FF]/$100]*$100

@@ -302,3 +302,52 @@ BASIC, 8K at $A000:
   - The left slot always maps to $A000-$BFFF; no address switch is needed.
   - Display without RAM: COLBK with DMA off, racing the beam with WSYNC, or a display list held in ROM.
 - **Atarimax MaxFlash:** its boot menu needs working RAM and the OS, so it's unsuitable for a no-RAM test. Useful for the later stages.
+
+---
+
+## 13. Proposed: three sets by RAM size, and more test areas (2026-11-07, for review)
+
+The user picks the set that matches the machine. A set never loads a stage
+the machine can't hold, and it loads in as few steps as the RAM allows.
+
+| Set | For | Layout |
+|---|---|---|
+| `diag-400-*` | 8K 400 | As built: each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. |
+| `diag-16k-*` | 16K-32K 400/800 | One larger load per tape, then a small part that relocates to test the RAM the main code sat in. A test menu: run everything in order, or step forward and back through the tests. |
+| `diag-48k-*` | 48K 800, XL/XE | As 16k, plus the RAM under the OS, the 130XE banks, the BASIC and self-test ROMs, and the XL's two joystick ports. |
+| `diag-burnin` | all | One version. It sizes the RAM itself. |
+
+Every set still tests the RAM its own code occupies. On the 400 that means
+relocating a small march into the screen block with the screen off, and
+reporting by beeps.
+
+Test menu (16k/48k): START runs the highlighted test, SELECT moves to the
+next, OPTION to the previous. Left alone for 10 s, it runs all of them in
+order, as now.
+
+ROM test: CRC32 matched against section 10a. On the 400/800 each OS chip is
+identified on its own, so a repaired board with mixed revisions shows which
+chip is which. Anything that matches nothing is UNKNOWN; the raw CRC32 is
+always shown.
+
+New test areas (16k/48k; 8K where they fit). "Auto" means the test passes or
+fails without asking the user:
+- **ANTIC:**
+  - every mode 2-F shown, labelled, and answered Y/N
+  - display-list features: LMS, blank lines, JMP/JVB, fine scrolling (HSCROL/VSCROL), narrow and wide playfields, CHACTL (inverse, blank, upside down), a RAM font via CHBASE
+  - DLI and VBI counts against VCOUNT (auto)
+- **GTIA:**
+  - the GTIA modes 9/10/11, each answered Y/N
+  - players and missiles at each width and priority, plus the fifth player
+  - collision registers: P-PF, P-P, M-PF and M-P with HITCLR, checked against known overlaps (auto)
+  - trigger latches
+- **POKEY sound:**
+  - the distortions (AUDC 0-7)
+  - volume-only mode
+  - 16-bit linked channels, the 1.79 MHz and 15 kHz clocks, the high-pass filters, two-tone mode
+  - the timer IRQs at each clock, timed against VCOUNT (auto)
+- **PIA:** joystick direction lines one by one, the PROCEED/INTERRUPT lines, and cassette motor control.
+
+Open: which of these are wanted, and in what order; whether the remaining
+400 tests (ROM, POKEY, joysticks, paddles, GTIA) become extra single-stage
+`diag-400` tapes.

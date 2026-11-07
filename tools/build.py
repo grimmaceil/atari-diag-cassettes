@@ -20,11 +20,13 @@ MADS = ROOT / 'tools' / 'bin' / 'mads.exe'
 BUILD = ROOT / 'build'
 SHARE = Path('//TRUENAS/Media/games/ATARI800')   # MiSTer Atari800 core's folder
 
-# Each tape: source dir, name, stages (first = boot). A later stage is told
-# where the boot stage keeps its BSS and where its own test area ends.
-TAPES = [('tape1', 'diag-01-boot-ram', ['main.asm', 'stage2.asm']),
-         ('tape2', 'diag-02-ram-burnin', ['main.asm']),
-         ('tape3', 'diag-03-system', ['main.asm', 'stage2.asm'])]
+# Each tape: source dir, name, stages (first = boot), defines. A later stage
+# is told where the boot stage keeps its BSS and where its own test area ends.
+# The two-stage tape 3 is out until the 16k/48k sets: the three-state keyboard
+# no longer leaves room for the loader in 8K.
+TAPES = [('tape1', 'diag-01-boot-ram', ['main.asm', 'stage2.asm'], {}),
+         ('tape2', 'diag-02-ram-burnin', ['main.asm'], {}),
+         ('tape3', 'diag-400-03-system', ['main.asm'], {'ONESTAGE': 1})]
 
 
 def mads(src, asm, out, defines):
@@ -70,8 +72,8 @@ def main():
 
     BUILD.mkdir(exist_ok=True)
     cas = []
-    for src, name, stages in TAPES:
-        d = {'FAST': 1} if a.fast else {}
+    for src, name, stages, defs in TAPES:
+        d = dict(defs, FAST=1) if a.fast else dict(defs)
         cas += build(src, name, stages, d, f'A8 {name.upper()}')
         if a.fault:
             bank, bit, *every = a.fault.split(',')
