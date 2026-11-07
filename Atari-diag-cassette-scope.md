@@ -305,17 +305,22 @@ BASIC, 8K at $A000:
 
 ---
 
-## 13. Proposed: three sets by RAM size, and more test areas (2026-11-07, for review)
+## 13. Sets by RAM size, and more test areas (2026-11-07)
 
 The user picks the set that matches the machine. A set never loads a stage
 the machine can't hold, and it loads in as few steps as the RAM allows.
 
 | Set | For | Layout |
 |---|---|---|
-| `diag-400-*` | 8K 400 | As built: each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. |
-| `diag-16k-*` | 16K-32K 400/800 | One larger load per tape, then a small part that relocates to test the RAM the main code sat in. A test menu: run everything in order, or step forward and back through the tests. |
-| `diag-48k-*` | 48K 800, XL/XE | As 16k, plus the RAM under the OS, the 130XE banks, the BASIC and self-test ROMs, and the XL's two joystick ports. |
-| `diag-burnin` | all | One version. It sizes the RAM itself. |
+| `diag-400-*` (built) | 8K 400 | Each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. The tests are split logically and run progressively: 01 RAM, 02 ROMs (test 1), 03 input (tests 2-3), 04 ports (5-6), 05 sound and video (4, 7). Later tapes rely only on what earlier ones proved: the Y/N answers come from keys already tested. |
+| `diag-16k-*` | 16K-32K 400/800 | Fewer, larger loads. A test menu to step forward and back through the tests. |
+| `diag-48k-*` | 48K 800, XL/XE | As 16k, plus the RAM under the OS, the 130XE banks, BASIC and the self-test ROM, and the XL's two joystick ports. |
+| `diag-burnin` (built) | all | One version. It sizes the RAM itself. |
+
+The system tapes are built from one `src/system/main.asm`, with a file per
+test (`t_rom`, `t_kb`, `t_con`, `t_joy`, `t_pad`, `t_pok`, `t_gtia`). The
+WANT_* defines pick which tests a tape gets, so the 16k/48k sets reuse the same
+files. A test keeps its number, and so its beep code, on every tape.
 
 Every set still tests the RAM its own code occupies. On the 400 that means
 relocating a small march into the screen block with the screen off, and

@@ -5,11 +5,22 @@ Each tape reports with synchronized beeps and border flashes first, so it is
 useful before the video works. A text screen comes in only once the display
 hardware checks out.
 
+There are three sets, one per RAM size, so a tape never needs more RAM than
+the machine has: `diag-400-*` for an 8K 400, and `diag-16k-*` and `diag-48k-*`
+(still to come: they will load in fewer steps). The tapes run in order. Each
+one relies only on what the earlier ones proved; for example, the keyboard is
+tested before any tape asks a Y/N question.
+
 | Tape | File | What it does |
 |---|---|---|
-| 1 | `diag-01-boot-ram.cas` | Low RAM, then the main RAM banks with March C- and address-in-address tests. On the XL/XE it also tests the RAM under the OS ROM, and on the 130XE the four extended banks. Two stages; stage 2 needs 16K. |
-| 2 | `diag-02-ram-burnin.cas` | Loops the RAM tests until a key is pressed. It keeps a clock, a pass count and a log of the first and last failure for each bit, and flags intermittent faults. |
-| 3 | `diag-03-system.cas` | 1 ROM checksums, 2 keyboard, 3 console keys and speaker, 4 POKEY, 5 joysticks, 6 paddles, 7 GTIA. Two stages; an 8K 400 gets tests 2-3. |
+| 1 | `diag-400-01-ram.cas` | Low RAM, then the main RAM banks with March C- and address-in-address tests. On 16K and up a second stage also tests the RAM the first stage sat in, the RAM under the XL/XE OS ROM, and the 130XE's four extended banks. |
+| 2 | `diag-400-02-rom.cas` | Test 1: the OS chips, BASIC or a cartridge, and the font, identified by CRC32 against published tables (per chip on the 400/800, so a repaired board with mixed revisions shows up). |
+| 3 | `diag-400-03-input.cas` | Test 2: the keyboard, a map with three key states (not pressed, done, held), told apart by brightness. Test 3: the console keys and speaker. |
+| 4 | `diag-400-04-ports.cas` | Test 5: joysticks, live, on all four ports. Test 6: paddles, with an open-input check, then value, min/max, jitter and trigger. |
+| 5 | `diag-400-05-av.cas` | Test 4: the POKEY timer, RANDOM and the four voices by ear. Test 7: GTIA luminance and hue ramps. |
+| - | `diag-burnin.cas` | One version for every machine. It loops the RAM tests until a key is pressed, keeping a clock, a pass count and a log of the first and last failure for each bit, and flags intermittent faults. |
+
+A test's number (and so its beep code) is the same on every tape.
 
 The `-part2.cas` files hold stage 2 alone. Use them if your tape player or
 emulator doesn't stop between stages.
@@ -55,9 +66,8 @@ and tests it on hardware.
 
 ## Status
 
-Tapes 1 and 2 have been run on a MiSTer Atari800 core. Tape 3 has only been
-run in the simulator so far. The ROM checksums are shown raw; there is no
-revision table yet.
+The RAM tape and the burn-in have been run on a MiSTer Atari800 core. Tapes
+2-5 of the 400 set have only been run in the simulator so far.
 
 Issues and pull requests are the way to reach the author; email is not
 checked.

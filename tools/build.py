@@ -22,11 +22,18 @@ SHARE = Path('//TRUENAS/Media/games/ATARI800')   # MiSTer Atari800 core's folder
 
 # Each tape: source dir, name, stages (first = boot), defines. A later stage
 # is told where the boot stage keeps its BSS and where its own test area ends.
-# The two-stage tape 3 is out until the 16k/48k sets: the three-state keyboard
-# no longer leaves room for the loader in 8K.
-TAPES = [('tape1', 'diag-01-boot-ram', ['main.asm', 'stage2.asm'], {}),
-         ('tape2', 'diag-02-ram-burnin', ['main.asm'], {}),
-         ('tape3', 'diag-400-03-system', ['main.asm'], {'ONESTAGE': 1})]
+# The system tapes are one main.asm with the tests picked by WANT_* defines.
+# Tape 1 still has its stage 2 (16K and up) until the 16k/48k sets exist.
+S400 = {'SETNO': 0}
+TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
+         ('system', 'diag-400-02-rom', ['main.asm'], dict(S400, TAPENO=2, WANT_ROM=1)),
+         ('system', 'diag-400-03-input', ['main.asm'],
+          dict(S400, TAPENO=3, WANT_KB=1, WANT_CON=1)),
+         ('system', 'diag-400-04-ports', ['main.asm'],
+          dict(S400, TAPENO=4, WANT_JOY=1, WANT_PAD=1)),
+         ('system', 'diag-400-05-av', ['main.asm'],
+          dict(S400, TAPENO=5, WANT_POK=1, WANT_GTIA=1)),
+         ('tape2', 'diag-burnin', ['main.asm'], {})]
 
 
 def mads(src, asm, out, defines):

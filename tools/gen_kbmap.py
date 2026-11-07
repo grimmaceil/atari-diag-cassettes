@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate src/tape3/kbmap.asm: the on-screen keyboard for tape 3.
+"""Generate src/system/kbmap.asm: the on-screen keyboard for tape 3.
 
 The layout is printed as five text rows; each key is a label with a space
 after it, so lighting a key means inverting from its offset up to the next
@@ -77,7 +77,7 @@ def main():
     s1, s2 = offsets('SHIFT')
     lines += [f'KO_SHIFT1 = {s1}', f'KO_SHIFT2 = {s2}', f"KO_CTRL\t= {offsets('CTRL')[0]}",
               f"KO_BREAK = {offsets('BREAK')[0]}", '']
-    out = Path(__file__).resolve().parent.parent / 'src' / 'tape3' / 'kbmap.asm'
+    out = Path(__file__).resolve().parent.parent / 'src' / 'system' / 'kbmap.asm'
     out.parent.mkdir(exist_ok=True)
     out.write_text('\n'.join(lines), encoding='ascii')
     print(out, 'written')

@@ -21,6 +21,10 @@ GRACTL	= $D01D		; 3 = take players and missiles from DMA
 AUDF1	= $D200
 AUDC1	= $D201
 AUDCTL	= $D208
+POT0	= $D200		; read: paddle values, 0-228 (POT0-POT7)
+STIMER	= $D209		; write: restart the POKEY timers
+RANDOM	= $D20A
+POTGO	= $D20B		; write: start a pot scan
 KBCODE	= $D209
 SKCTL	= $D20F		; write 3 = normal keyboard/serial operation
 SKSTAT	= $D20F

@@ -48,6 +48,7 @@ class Atari:
         self.mpu = None
         self.events = []         # (line, reg, value)
         self.regs = {}
+        self.romover = {}       # --forge: stand-in ROM bytes replaced
         self.pm = {}            # GRACTL, PMBASE: for the P/M color mask in screen()
 
     def active(self, kind):
@@ -118,6 +119,8 @@ class Atari:
                 return a >> 8    # e.g. a 16K 600XL: nothing under the OS
         elif a >= 0xC000:
             if self.xl or a >= 0xD800:
+                if a in self.romover:
+                    return self.romover[a]
                 return ((a * 31) ^ (a >> 3)) & 0xFF    # stand-in ROM bytes
             return a >> 8        # 400/800: nothing at $C000-$CFFF
         if self.ramtop <= a < 0xC000:
@@ -220,6 +223,35 @@ class Atari:
             addr += 40
             scan += 8
         return '\n'.join(f'{i:2d}|{r}' for i, r in enumerate(rows))
+
+
+def forge(hw, spec):
+    """--forge ADDR=CRC,...: make the stand-in ROM chip at ADDR (D800, E000 or
+    F000, 400/800 sizes) hit that CRC32, by solving for its last 4 bytes
+    (CRC32 is affine over GF(2)), so tape 3's ROM names can be tested
+    without real ROM images."""
+    import zlib
+    size = {0xD800: 0x800, 0xE000: 0x1000, 0xF000: 0x1000}
+    for item in spec.split(','):
+        addr, want = (int(x, 16) for x in item.split('='))
+        body = bytes(hw[a] for a in range(addr, addr + size[addr] - 4))
+        base = zlib.crc32(body + bytes(4))
+        cols = [zlib.crc32(body + (1 << i).to_bytes(4, 'little')) ^ base for i in range(32)]
+        rows = [(cols[i], 1 << i) for i in range(32)]     # (crc effect, x bits)
+        x, need = 0, base ^ want
+        for bit in range(32):                              # Gaussian elimination
+            piv = next(k for k in range(bit, 32) if rows[k][0] >> bit & 1)
+            rows[bit], rows[piv] = rows[piv], rows[bit]
+            for k in range(32):
+                if k != bit and rows[k][0] >> bit & 1:
+                    rows[k] = (rows[k][0] ^ rows[bit][0], rows[k][1] ^ rows[bit][1])
+        for bit in range(32):
+            if need >> bit & 1:
+                x ^= rows[bit][1]
+        tail = x.to_bytes(4, 'little')
+        assert zlib.crc32(body + tail) == want
+        for i, v in enumerate(tail):
+            hw.romover[addr + size[addr] - 4 + i] = v
 
 
 SIOV = 0xE459
@@ -429,6 +461,7 @@ def main():
     ap.add_argument('--until', type=float, help='stop at this simulated time (s)')
     ap.add_argument('--deny', default='', help='with --auto: answer No where the screen shows these (comma list)')
     ap.add_argument('--skip', type=int, default=0, help='with --auto: leave this many keys unpressed')
+    ap.add_argument('--forge', help='ADDR=CRC32,...: stand-in 400/800 OS chips with these CRCs')
     ap.add_argument('-v', action='store_true')
     a = ap.parse_args()
 
@@ -460,6 +493,8 @@ def main():
     keys = [(to_line(t), to_line(t) + to_line(0.25)) for t in a.key.split(',') if t]
     snaps = sorted(to_line(t) for t in a.snap.split(',') if t)
     hw = Atari(a.ram, stuck, a.mirror, a.xl or a.xe, a.pal, keys, a.xe, xstuck)
+    if a.forge:
+        forge(hw, a.forge)
     hw.xealias = a.xealias
     if a.flaky:
         bank, bit, prob = a.flaky.split(':')

@@ -1,10 +1,8 @@
 # Build intermediates; only the release tapes are kept.
 build/*
-!build/diag-01-boot-ram.cas
-!build/diag-01-boot-ram-part2.cas
-!build/diag-02-ram-burnin.cas
-!build/diag-03-system.cas
-!build/diag-03-system-part2.cas
+!build/diag-400-0*.cas
+!build/diag-burnin.cas
+build/*FAULT*
 
 # The assembler is fetched separately (see README).
 tools/bin/
