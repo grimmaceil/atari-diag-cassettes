@@ -157,6 +157,8 @@ scrcand	.byte SCR1, $3C, $7C, $BC
 	.if SCR1+4>$C0
 	.error "stage too big: no screen block fits in 48K"
 	.endif
+	.elseif .def BOUNCE		; the 16K+ burn-in: it checks the room for
+					; copy B itself, as it runs
 	.elseif .def BIGSTAGE		; the 16k system tape: 16K
 	.if SCR1+4>$40
 	.error "stage too big: no screen block fits in 16K"

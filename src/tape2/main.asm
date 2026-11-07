@@ -7,7 +7,33 @@
 ;   address test, and on the XL/XE the RAM under the OS (bank 4, but not
 ;   page $FF) and the 130XE banks (5-8).
 ; Not covered: $0800 up to TSTART, where this stage runs (tape 1's stage 2
-; tests it).
+; tests it), unless built with:
+;   OWNTEST (diag-400-burnin): every pass also checks this stage's own RAM.
+;     Its image sum must not change from pass 1's (the code changes a few of
+;     its own operands as it runs, the same way every pass), and every
+;     byte from $0800 up to TSTART, and the screen block, takes a NOT test:
+;     invert it, read it back, put it back, read it back. That proves each
+;     bit holds 0 and 1 without losing the code. The test runs from a copy
+;     in low RAM ($0480), with the VBI and ANTIC off. Faults go in the log
+;     as bank 9 ("B9", this tape's RAM), and beep as bank 1.
+;   NOXL (diag-400-burnin): no RAM under the OS, no 130XE banks (an 8K
+;     machine is never an XL), which leaves the room for OWNTEST.
+;   BOUNCE (diag-burnin, 16K and up): two copies take turns. Copy A runs at
+;     $0800; at the end of each pass the running copy writes the other one
+;     BOFF pages away (A up, B back down), adds BOFF to every byte the
+;     bitmap at BMAP marks (the high bytes of its own addresses; build.py
+;     makes the bitmap by assembling at two addresses), copies its BSS page
+;     across, reads it all back, and goes on there. Each copy tests the
+;     other's RAM in full, march and address tests included, so over two
+;     passes every byte from $0800 up is tested, this tape's own RAM too.
+;     So one counted pass is A's half and B's half together: the log, the
+;     pass number and the border all go by the pair. The distance is BOFF
+;     on the 400/800, BOFFXL on the XL/XE: there copy B sits at $8000, out
+;     of the 130XE's banking window ($4000-$7FFF), which the extended-bank
+;     test switches away from under the CPU. Both are whole 1K blocks, and
+;     the bitmap works for any such distance (no page number overflows).
+;     Without the RAM for copy B (it needs about 20K), A gives its own RAM
+;     the OWNTEST checks instead (BOUNCE builds include OWNTEST).
 ;
 ; Every bad bit goes in a log: bank, bit, the pass it was first seen in, and
 ; how many passes since then it failed in. A bit that fails every pass is
@@ -31,7 +57,32 @@
 BURNIN	= 1			; xlram.asm: page $FF stays out, NMI vector in RAM
 LRCALL	= 1			; boot.asm: lowram can be called again
 RPCOLVAR = 1			; report.asm: steady color from RPCOL
+	.ifdef BOUNCE
+FONT	= LOAD+$3000		; ROM font copy while the OS is out (moves with
+				; the copy; BOFF is a whole number of 1K blocks)
+REGLO	= BSS+$F4		; bankrange: the region, pages [REGLO, REGHI)
+REGHI	= BSS+$F5
+XOFF	= BSS+$F6		; the distance to copy B, pages: BOFF or BOFFXL
+BOFFXL	= $78			; XL/XE: copy B at $8000
+BMP	= $88			; bcopy: bitmap pointer, its byte, its bit,
+BMB	= $8A			; bytes left, write (0) or read back, the
+BMK	= $8B			; offset in pages, a read-back failed
+BLEFT	= $8C
+BVER	= $8E
+BDIR	= $8F
+BFAIL	= $90
+	.else
 FONT	= $3800			; ROM font copy while the OS is switched out
+	.endif
+	.ifdef OWNTEST
+LDRFOLD	= 1			; report.asm: bank 9 (own RAM) beeps as bank 1
+NTCODE	= $0480			; the NOT test's copy, in low RAM
+NTPTR	= $88			; NOT test: page pointer, errors, the byte
+NTERR	= $8A
+NTSAV	= $8B
+REFSUM	= BSS+$F1		; 2: pass 1's image sum
+REFOK	= BSS+$F3		; nonzero: REFSUM is set
+	.endif
 
 ; Tape 2 variables, in the BSS page above the shared ones.
 PASSNO	= BSS+$E0		; 2: passes started
@@ -66,7 +117,11 @@ XITVBV	= $E462			; OS VBI exit: restores the registers, RTI
 NMIRES	= $D40F
 
 	opt h-
+	.ifdef BOUNCE
+LOAD	= BLOAD			; build.py: $0800 (and $0C00 for the bitmap)
+	.else
 LOAD	= $0800
+	.endif
 	org LOAD
 
 ; Cassette boot header. The OS reads NREC records to LOAD, then JSRs LOAD+6.
@@ -85,6 +140,20 @@ cl_log	sta FIRSTLO,x
 	bne cl_log
 	jsr detect
 	jsr dprereq
+	.ifdef BOUNCE
+	lda #BOFF
+	ldx MACHINE
+	beq bi_off
+	lda #BOFFXL
+bi_off	sta XOFF
+	.endif
+	.ifdef OWNTEST
+	ldx #NTLEN-1		; the NOT test into low RAM
+nt_cp	lda ntsrc,x
+	sta NTCODE,x
+	dex
+	bpl nt_cp
+	.endif
 	lda #60
 	ldx ISPAL
 	beq bi_fps
@@ -114,7 +183,15 @@ bi_vbi	lda #$40		; keyboard interrupt on in POKEY (the CPU still
 
 ; ---------------------------------------------------------------------------
 ; One pass.
-pass1	inc PASSNO
+pass1
+	.ifdef BOUNCE
+	lda #>LOAD		; copy B: the second half of A's pass, which
+	cmp #$08		; goes on as it is
+	beq ps_a
+	jmp ps_half
+ps_a
+	.endif
+	inc PASSNO
 	bne ps_go
 	inc PASSNO+1
 ps_go	lda BCOL
@@ -136,7 +213,7 @@ ps_nf
 	.endif
 	jsr showpass
 
-	lda #<s_low		; low RAM, with the VBI off
+ps_half	lda #<s_low		; low RAM, with the VBI off
 	ldy #>s_low
 	jsr step
 	lda #0
@@ -149,9 +226,49 @@ ps_nf
 ps_lr	jsr tick
 	dex
 	bne ps_lr
+	.ifdef OWNTEST
+	jsr owntest
+	.endif
 	lda #$40
 	sta NMIEN
 
+	.ifdef BOUNCE
+	lda #$08		; main banks: below this copy (copy B: A's RAM)
+	sta REGLO
+	lda #>LOAD
+	sta REGHI
+	jsr banks
+	lda #TSTART		; and above it
+	sta REGLO
+	lda RAMTOP
+	sta REGHI
+	jsr banks
+	lda RAMTOP		; one flash per 16K bank, at the end
+	clc
+	adc #$3F
+	asl
+	rol
+	rol
+	and #3
+	sta NBANKS
+	lda #<s_aia		; address-in-address, each region
+	ldy #>s_aia
+	jsr step
+	lda #>LOAD
+	cmp #$09
+	bcc ps_ai2
+	lda #$08
+	sta RBS
+	lda #>LOAD
+	sta RBE
+	jsr aiarun
+ps_ai2	lda #TSTART
+	sta RBS
+	lda RAMTOP
+	sta RBE
+	jsr aiarun
+	jmp ps_xl
+	.endif
 	lda #1			; main banks
 	sta CURBANK
 ps_bank	jsr bankrange
@@ -190,6 +307,8 @@ ps_nb	inc CURBANK
 	jsr aia
 	dec INAIA
 
+ps_xl
+	.ifndef NOXL
 	lda MACHINE
 	beq ps_end
 	lda #0
@@ -197,8 +316,21 @@ ps_nb	inc CURBANK
 	sta XERAM
 	jsr underos
 	jsr xebanks
+	.endif
 
-ps_end	jsr logpass
+ps_end
+	.ifdef BOUNCE
+	jsr halfa		; copy A's half with copy B to come: the log, and
+	bcc ps_log		; a stop, wait for B's half (the pass in progress
+	jsr bounce		; is the pair)
+	lda STOPREQ		; (the copy didn't read back: A goes on alone)
+	beq ps_ag
+	jsr logpass
+	jmp stop
+ps_ag	jmp pass1
+ps_log
+	.endif
+	jsr logpass
 	jsr pulse
 	lda DISPOK
 	beq ps_next
@@ -206,6 +338,9 @@ ps_end	jsr logpass
 	jsr showlog
 ps_next	lda STOPREQ
 	bne stop
+	.ifdef BOUNCE
+	jsr bounce		; on to the other copy, if there is room for it
+	.endif
 	jmp pass1
 
 ; ---------------------------------------------------------------------------
@@ -605,6 +740,7 @@ cr_lp	jsr putc
 	bne cr_lp
 	rts
 
+	.ifndef NOXL
 ; Progress hooks for xlram.asm.
 osprog	lda #<s_os
 	ldy #>s_os
@@ -612,6 +748,298 @@ osprog	lda #<s_os
 xeprog	lda #<s_xe
 	ldy #>s_xe
 	jmp step
+	.endif
+
+	.ifdef BOUNCE
+; banks: the march over banks 1-3, each clipped to [REGLO, REGHI).
+banks	lda #1
+	sta CURBANK
+bk_lp	jsr bankrange
+	bcs bk_nb
+	lda #<s_bank
+	ldy #>s_bank
+	jsr step
+	lda CURBANK
+	clc
+	adc #$10
+	jsr putc_s
+	jsr split
+	lda RNGN
+	beq bk_nb
+	jsr setfmask
+	jsr march2
+bk_nb	inc CURBANK
+	lda CURBANK
+	cmp #4
+	bne bk_lp
+	rts
+
+; aiarun: address-in-address over [RBS, RBE), both modes.
+aiarun	jsr split
+	inc INAIA
+	lda #0
+	sta AIAMODE
+	jsr aia
+	inc AIAMODE
+	jsr aia
+	dec INAIA
+	rts
+
+; halfa: C set if this is copy A and copy B fits (A's pass is half a pass).
+halfa	lda #>LOAD
+	cmp #$08
+	bne ha_no
+	jmp broom
+ha_no	clc
+	rts
+
+; broom: C set if the RAM reaches copy B's screen block (its last page).
+broom	lda #SCR1+4
+	clc
+	adc XOFF
+	sta MTMP
+	lda RAMTOP
+	cmp MTMP
+	rts
+
+; bounce: write the other copy and go on there. Copy A goes up to B if the
+; RAM reaches B's screen block; B always comes back down. The VBI is off
+; while the image and the BSS page (clock included) are copied and read
+; back; the clock gets the time back as an allowance.
+bounce	lda #>LOAD
+	cmp #$08
+	bne bo_dn
+	jsr broom
+	bcc bo_x
+	lda XOFF
+	bne bo_go
+bo_dn	lda #0
+	sec
+	sbc XOFF
+bo_go	sta BDIR
+	lda #0
+	sta NMIEN
+	ldx #24			; the time the copy takes, about 0.4 s, first:
+bo_t	jsr tick		; the clock goes across with the BSS page
+	dex
+	bne bo_t
+	lda #0
+	sta BVER
+	sta BFAIL
+	jsr bcopy
+	inc BVER
+	jsr bcopy
+	lda BFAIL
+	beq bo_sw
+	lda #$40		; the copy didn't read back: stay here (the next
+	sta NMIEN		; pass's march finds that RAM)
+bo_x	rts
+bo_sw	lda #<vbios		; the VBI and the code: the other copy's
+	sta VVBLKI
+	lda #>vbios
+	clc
+	adc BDIR
+	sta VVBLKI+1
+	lda #<resume
+	sta PTR
+	lda #>resume
+	clc
+	adc BDIR
+	sta PTR+1
+	jmp (PTR)
+
+; resume: here in the other copy. Its own screen block, then the next pass.
+resume	ldx #$FF
+	txs
+	lda DISPOK
+	beq rs_vbi
+	lda #SCR1
+	sta SCRPG
+	jsr scr_on
+	jsr bscreen
+	jsr showpass
+	jsr showlog
+rs_vbi	lda #$40
+	sta NMIEN
+	jmp pass1
+
+; bcopy: BVER 0: write this copy's image BDIR pages away, plus BDIR on
+; every byte the bitmap marks; then the rest (the bitmap, padding, BSS page)
+; as is. BVER 1: read it all back the same way, BFAIL nonzero on a miss.
+bcopy	lda #0
+	sta PTR
+	sta SPTR
+	sta BMK			; (0: fetch a bitmap byte first)
+	lda #>LOAD
+	sta PTR+1
+	clc
+	adc BDIR
+	sta SPTR+1
+	lda #<BMAP
+	sta BMP
+	lda #>BMAP
+	sta BMP+1
+	lda #<[BMAP-LOAD]
+	sta BLEFT
+	lda #>[BMAP-LOAD]
+	sta BLEFT+1
+	ldy #0
+bc_lp	lda BMK
+	bne bc_hb
+	lda (BMP),y
+	sta BMB
+	inc BMP
+	bne bc_m1
+	inc BMP+1
+bc_m1	lda #1
+	sta BMK
+bc_hb	lda BMB
+	and BMK
+	beq bc_raw
+	lda (PTR),y
+	clc
+	adc BDIR
+	jmp bc_put
+bc_raw	lda (PTR),y
+bc_put	jsr bc_st
+	asl BMK
+	jsr bc_inc
+	bne bc_lp
+	lda #<[BSS+$100-BMAP]	; the rest, as is
+	sta BLEFT
+	lda #>[BSS+$100-BMAP]
+	sta BLEFT+1
+bc_r	lda (PTR),y
+	jsr bc_st
+	jsr bc_inc
+	bne bc_r
+	rts
+; bc_st: store A at (SPTR), or compare it there.
+bc_st	ldx BVER
+	bne bc_cmp
+	sta (SPTR),y
+	rts
+bc_cmp	cmp (SPTR),y
+	beq bc_ok
+	inc BFAIL
+bc_ok	rts
+; bc_inc: both pointers on, one byte less to go. Z set at the end.
+bc_inc	inc PTR
+	bne bc_i1
+	inc PTR+1
+bc_i1	inc SPTR
+	bne bc_i2
+	inc SPTR+1
+bc_i2	lda BLEFT
+	bne bc_i3
+	dec BLEFT+1
+bc_i3	dec BLEFT
+	lda BLEFT
+	ora BLEFT+1
+	rts
+	.endif
+
+	.ifdef OWNTEST
+; owntest: this stage's own RAM (called with the VBI off). The image sum
+; first, then the NOT test over $0800 up to TSTART and the screen block,
+; with ANTIC off (the display list is in that block). The clock gets the
+; time back as a fixed allowance, like the low RAM test.
+owntest
+	.ifdef BOUNCE
+	lda #>LOAD		; copy B, or A with copy B coming: the bounce
+	cmp #$08		; tests this RAM in full
+	bne ot_no
+	jsr broom
+	bcc ot_go
+ot_no	rts
+ot_go
+	.endif
+	lda #0
+	sta NTERR
+	sta SUM
+	sta SUM+1
+	sta PTR
+	lda #>LOAD
+	sta PTR+1
+	ldy #0
+ot_sum	lda (PTR),y		; every image byte but the stored sum
+	clc
+	adc SUM
+	sta SUM
+	bcc ot_nc
+	inc SUM+1
+ot_nc	iny
+	bne ot_s1
+	inc PTR+1
+ot_s1	lda PTR+1
+	cmp #>CKSUM
+	bne ot_sum
+	cpy #<CKSUM
+	bne ot_sum
+	lda REFOK		; pass 1: this is the reference
+	bne ot_cmp
+	inc REFOK
+	lda SUM
+	sta REFSUM
+	lda SUM+1
+	sta REFSUM+1
+ot_cmp	lda SUM			; changed: the bits that differ, as a hint
+	eor REFSUM
+	sta NTERR
+	lda SUM+1
+	eor REFSUM+1
+	ora NTERR
+	sta NTERR
+	lda #0
+	sta DMACTL
+	sta NTPTR
+	lda #>LOAD
+	sta NTPTR+1
+	ldx #TSTART-[>LOAD]
+	jsr NTCODE
+	lda DISPOK
+	beq ot_end
+	lda SCRPG
+	sta NTPTR+1
+	ldx #4
+	jsr NTCODE
+	lda SCRON		; the screen back, as it was
+	beq ot_end
+	lda #$22
+	sta DMACTL
+ot_end	lda NTERR
+	ora BADMASK+LDRIDX
+	sta BADMASK+LDRIDX
+	ldx #9			; about 0.15 s
+ot_t	jsr tick
+	dex
+	bne ot_t
+	rts
+
+; The NOT test, copied to NTCODE (so it never inverts itself) and written to
+; run from anywhere: (NTPTR),y only. X pages from NTPTR; errors ORed into
+; NTERR.
+ntsrc	ldy #0
+nt_lp	lda (NTPTR),y
+	sta NTSAV
+	eor #$FF
+	sta (NTPTR),y
+	eor (NTPTR),y		; bits that didn't take the inverse
+	ora NTERR
+	sta NTERR
+	lda NTSAV
+	sta (NTPTR),y
+	eor (NTPTR),y		; bits that didn't come back
+	ora NTERR
+	sta NTERR
+	iny
+	bne nt_lp
+	inc NTPTR+1
+	dex
+	bne nt_lp
+	rts
+NTLEN	= *-ntsrc
+	.endif
 
 ; bankrange: RBS/RBE = the pages of bank CURBANK to test. C set if none.
 bankrange lda CURBANK
@@ -623,9 +1051,15 @@ bankrange lda CURBANK
 	asl
 	asl
 	asl
+	.ifdef BOUNCE
+	cmp REGLO
+	bcs br_s
+	lda REGLO
+	.else
 	cmp #TSTART
 	bcs br_s
 	lda #TSTART
+	.endif
 br_s	sta RBS
 	lda CURBANK
 	asl
@@ -634,9 +1068,15 @@ br_s	sta RBS
 	asl
 	asl
 	asl
+	.ifdef BOUNCE
+	cmp REGHI
+	bcc br_e
+	lda REGHI
+	.else
 	cmp RAMTOP
 	bcc br_e
 	lda RAMTOP
+	.endif
 br_e	sta RBE
 	lda RBS
 	cmp RBE
@@ -656,7 +1096,9 @@ NPAT	= *-pats
 	icl '../common/screen.asm'
 	icl '../common/ramtest.asm'
 	icl '../common/info.asm'
+	.ifndef NOXL
 	icl '../common/xlram.asm'
+	.endif
 
 s_hpre	dta d' A8 DIAG  BURN-IN   ',$FF
 s_hburn	dta d'BURN-IN',$FF
@@ -668,8 +1110,10 @@ s_now	dta d'NOW: ',$FF
 s_low	dta d'LOW RAM $0000-$07FF',$FF
 s_bank	dta d'BANK ',$FF
 s_aia	dta d'ADDRESS TEST',$FF
+	.ifndef NOXL
 s_os	dta d'UNDER THE OS',$FF
 s_xe	dta d'130XE BANKS 5-8',$FF
+	.endif
 s_pass	dta d'PASS ',$FF
 s_time	dta d'   TIME ',$FF
 s_first	dta d'  FIRST ',$FF
@@ -682,6 +1126,12 @@ s_nsol	dta d' SOLID, ',$FF
 s_nextok dta d'NEXT: TAPE 02 OF THE SET',$FF
 s_nextbad dta d'FIX SOLID ONES FIRST',$FF
 s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
+
+	.ifdef BOUNCE
+; The relocation bitmap: one bit per image byte before BMAP, LSB first; set
+; for the bytes that hold this copy's own page numbers (build.py).
+BMAP	ins '../../build/bounce.bmap'
+	.endif
 
 ; Pad to a whole page; the last two bytes hold the image sum (mkcas.py).
 PADTO	= [[*+2+$FF]/$100]*$100

@@ -14,7 +14,7 @@ the fallback for any machine: it needs only the first 8K to work.
 | `diag-400-*` | 8K 400 | 01 RAM, then four small tapes that each fit 8K by themselves: 02 ROMs, 03 input, 04 ports, 05 sound and video |
 | `diag-16k-*` | 16K-32K 400/800 | 01 RAM, 02 system: all seven tests in one load, with a menu |
 | `diag-48k-xl-xe` | 48K 800, XL/XE | one tape, one load: RAM, the rest of RAM (where the tape itself loaded, the RAM under the OS, the 130XE banks), then the system tests with the menu |
-| `diag-burnin` | all | one version |
+| `diag-400-burnin`, `diag-burnin` | 8K / 16K and up | the burn-in; see below |
 
 The 48k+ tape is a single boot file, loaded at $4000. It tests $0800-$3FFF
 and everything above itself, copies the rest of its code into the proven RAM
@@ -58,7 +58,9 @@ The 400 set, tape by tape:
 | 3 | `diag-400-03-input.cas` | Test 2: the keyboard, as a map with three key states (not pressed, done, held) told apart by brightness. Test 3: the console keys and speaker. |
 | 4 | `diag-400-04-ports.cas` | Test 5: joysticks, live, on all four ports. Test 6: paddles, with an open-input check, then value, min/max, jitter and trigger. |
 | 5 | `diag-400-05-av.cas` | Test 4: the POKEY timer, RANDOM and the four voices by ear. Test 7: GTIA luminance and hue ramps. |
-| - | `diag-burnin.cas` | Every machine. It loops the RAM tests until a key is pressed, with a clock, a pass count and a log of the first and last failure for each bit, and flags intermittent faults. |
+| - | `diag-400-burnin.cas` | The burn-in for an 8K 400 (it runs on more, but `diag-burnin` is better there). It loops the RAM tests until a key is pressed, with a clock, a pass count and a log of each bad bit (first pass seen, passes failed), and flags intermittent faults. It also checks its own RAM on every pass: the program's checksum must not change, and every byte of it, and the screen, takes a NOT test (invert, read back, restore, read back) with interrupts off. Faults there log as bank 9. |
+
+`diag-burnin.cas` is the burn-in for 16K and up. From about 20K (32K, 48K, XL/XE), it keeps two copies of itself and swaps between them every pass. It writes the other copy through a relocation bitmap and reads it back before switching, so each copy tests the other's RAM with the full march and address tests. One counted pass is both halves, so every byte from $0800 up, its own code and screen included, is fully tested on every pass. On the XL/XE the second copy sits at $8000, out of the 130XE's banking window. On 16K it has no room for a second copy, so it uses the NOT test instead.
 
 A test's number (and so its beep code) is the same on every tape.
 

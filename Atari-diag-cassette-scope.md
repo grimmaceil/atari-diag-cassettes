@@ -258,12 +258,12 @@ self-test, which the CPU sees at $5000-$57FF when PORTB bit 7 = 0.
 | 1 | 643BCC98 | 600XL (MAME) |
 | 2 | 1F9CD270 | 800XL, 65XE, 130XE (MAME) |
 | 3 | 29F133F7 | 800XE (MAME) |
-| 3A | 0D477AA1 | |
-| 3B | D425A9CF | |
-| 4 | 1EAF4002 | |
+| 3A | 0D477AA1 | 1450XLD, 3/23/1984 (OSROMS.TXT: both are "rev 3") |
+| 3B | D425A9CF | 1450XLD, 6/21/1984 |
+| 4 | 1EAF4002 | XEGS (OSROMS.TXT, 05/07/1987) |
 | 5 | 0E000B99 | |
 | 59 | 45F47988 | MAME calls this "Rev. 3B ?" (Arabic 65XE) |
-| 59A | F0A236D3 | |
+| 59A | F0A236D3 | Offenga's OSROMS.TXT v3.3 calls this the Arabic 65XE's rev 3B, dated 7/21/1984. MAME and Offenga disagree on which dump is the Arabic one. |
 
 XL/XE halves, each 8K. The $C000 half is $C000-$CFFF, then the self-test,
 then $D800-$DFFF; the $E000 half is $E000-$FFFF. The 1200XL values are from
@@ -335,7 +335,7 @@ the machine can't hold, and it loads in as few steps as the RAM allows.
 | `diag-400-*` (built) | 8K 400 | Each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. The tests are split logically and run progressively: 01 RAM, 02 ROMs (test 1), 03 input (tests 2-3), 04 ports (5-6), 05 sound and video (4, 7). Later tapes rely only on what earlier ones proved: the Y/N answers come from keys already tested. |
 | `diag-16k-*` (built) | 16K-32K 400/800 | 01 RAM (tape 1: stage 2 relocates to test the RAM stage 1 sat in), 02 system: all seven tests in one 68-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; ALL runs every test). |
 | `diag-48k-xl-xe` (built) | 48K 800, XL/XE | One boot file, one load (138 records at $4000). Stage 1 is tape 1's, built with ONELOAD: it tests $0800-$3FFF and everything above the image, then copies a payload (built by build_oneload to run at $0800) into $0800-$3AFF. The payload is stage 2 (ONELOAD: it tests the image's RAM, $4000-$85FF, then the RAM under the OS and the 130XE banks; font copy at $B800) and the system tests at $1B00 with the menu; RAM faults become test 8. Bank 1 bad, or a load or image-checksum failure: use the 400 set, the fallback for every machine. |
-| `diag-burnin` (built) | all | One version. It sizes the RAM itself. |
+| `diag-400-burnin`, `diag-burnin` (built) | 8K / 16K+ | One load each. The 8K one (OWNTEST, NOXL) re-checks its own image sum and NOT-tests its own RAM and screen every pass. The 16K+ one (BOUNCE) swaps between two relocated copies every pass, $20 pages apart on the 400/800 and at $8000 on the XL/XE, so its own RAM gets the full tests too. It falls back to the NOT test when copy B doesn't fit (16K). |
 
 The system tapes are built from one `src/system/main.asm`, with a file per
 test (`t_rom`, `t_kb`, `t_con`, `t_joy`, `t_pad`, `t_pok`, `t_gtia`). The

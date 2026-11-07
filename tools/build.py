@@ -43,7 +43,8 @@ TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
          ('system', 'diag-16k-02-system', ['main.asm'],
           dict(ALL7, SETNO=1, TAPENO=2, MENU=1, BIGSTAGE=1)),
          ('oneload', 'diag-48k-xl-xe', [], dict(ALL7, SETNO=2, MENU=1)),
-         ('tape2', 'diag-burnin', ['main.asm'], {})]
+         ('tape2', 'diag-400-burnin', ['main.asm'], {'OWNTEST': 1, 'NOXL': 1}),
+         ('bounce', 'diag-burnin', [], {'BOUNCE': 1, 'BIGSTAGE': 1, 'OWNTEST': 1})]
 
 
 def mads(src, asm, out, defines):
@@ -115,6 +116,53 @@ def build_oneload(name, defines, label):
     return [Path(f'{out}.cas')]
 
 
+def build_bounce(name, defines, label):
+    """The 16K+ burn-in: tape 2 with BOUNCE. Its relocation bitmap marks the
+    bytes that hold its own page numbers: assembled at $0800 and at $0C00,
+    those bytes differ by exactly 4 (4 pages, not 1: the screen block is
+    found on a 1K boundary, so values made from it only move in steps of 4,
+    which is why BOFF is a multiple of 4 too). BOFF, the distance to copy B, is a
+    whole number of 1K blocks just past copy A's screen block. Checked: copy
+    A patched by the bitmap must equal the stage assembled at B's address."""
+    out = BUILD / name
+    bmap = BUILD / 'bounce.bmap'
+    tmp = Path(f'{out}.reloc')
+    def asm(load, boff, path):
+        mads('tape2', 'main.asm', path, dict(defines, BLOAD=f'${load:04X}', BOFF=f'${boff:02X}'))
+        return Path(f'{path}.bin').read_bytes(), labels(f'{path}.lab')
+    bmap.write_bytes(bytes(1))
+    _, lab = asm(0x0800, 0x1C, out)
+    nrel = lab['BMAP'] - 0x0800                  # bytes the bitmap covers
+    bmap.write_bytes(bytes((nrel + 7) // 8))
+    _, lab = asm(0x0800, 0x1C, out)
+    boff = (lab['SCR1'] + 4 - 0x08 + 3) & ~3
+    a0, lab = asm(0x0800, boff, out)
+    a1, _ = asm(0x0C00, boff, tmp)
+    assert lab['BMAP'] - 0x0800 == nrel and len(a0) == len(a1)
+    bits = bytearray((nrel + 7) // 8)
+    for i in range(nrel):
+        d = (a1[i] - a0[i]) & 0xFF
+        if d not in (0, 4):
+            sys.exit(f'build_bounce: byte ${0x0800 + i:04X} moves by {d}, not 0 or 4')
+        if d:
+            bits[i >> 3] |= 1 << (i & 7)
+    assert a0[nrel:] == a1[nrel:-2] + a0[-2:] or a0[nrel:-2] == a1[nrel:-2]
+    bmap.write_bytes(bytes(bits))
+    a0, lab = asm(0x0800, boff, out)             # the real one, with the bitmap
+    for off in (boff, lab['BOFFXL']):            # both places copy B can go
+        b0, _ = asm(0x0800 + off * 256, boff, tmp)   # as the assembler sees it
+        patched = bytes((v + off) & 0xFF if bits[i >> 3] >> (i & 7) & 1 else v
+                        for i, v in enumerate(a0[:nrel])) + a0[nrel:]
+        if patched[:-2] != b0[:-2]:
+            bad = next(i for i in range(len(b0) - 2) if patched[i] != b0[i])
+            sys.exit(f'build_bounce: copy B ({off:#04x} pages up) differs at ${bad:04X}')
+    print(f'{name}: copy A $0800-${lab["BSS"] - 1:04X}, copy B {boff:#04x} pages up, '
+          f'{sum(bin(x).count("1") for x in bits)} relocated bytes')
+    subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
+                    '--boot', f'{out}.bin', f'{out}.lab', '--name', label], check=True)
+    return [Path(f'{out}.cas')]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--fault', help='BANK,BIT[,EVERY]  (bank 0 = low RAM; EVERY: burn-in '
@@ -129,6 +177,9 @@ def main():
         d = dict(defs, FAST=1) if a.fast else dict(defs)
         if src == 'oneload':
             cas += build_oneload(name, d, f'A8 {name.upper()}')
+            continue
+        if src == 'bounce':
+            cas += build_bounce(name, d, f'A8 {name.upper()}')
             continue
         cas += build(src, name, stages, d, f'A8 {name.upper()}')
         if a.fault:

@@ -4,6 +4,7 @@ build/*
 !build/diag-16k-0*.cas
 !build/diag-48k-xl-xe*.cas
 !build/diag-burnin.cas
+!build/diag-400-burnin.cas
 build/*FAULT*
 
 # The assembler is fetched separately (see README).
