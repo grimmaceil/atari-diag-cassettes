@@ -46,6 +46,13 @@ cassette boot, SIO stage loads, RAM faults (stuck bits, flaky bits, mirrors),
 XL/XE banking, keys and joysticks. It prints the screen and decodes the beep
 code. `tools/gen_kbmap.py` regenerates the tape 3 keyboard map.
 
+## Authorship
+
+The author has programmed 6502 machine language and assembler since
+childhood. Even so, all of the code and documents here are, for now, 100%
+written by AI (Claude, by Anthropic). The author directs the work, reviews it
+and tests it on hardware.
+
 ## Status
 
 Tapes 1 and 2 have been run on a MiSTer Atari800 core. Tape 3 has only been

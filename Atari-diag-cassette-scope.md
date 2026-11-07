@@ -2,7 +2,7 @@
 
 Multi-stage, cassette-loaded diagnostic suite for Atari 8-bit computers (400, 800, 800XL; 130XE extended RAM as an optional stage). The goal is to give as much diagnostic information as possible through synchronized beeps and border flashes, adding plain-text screens as the video hardware proves itself.
 
-Working style: Claude writes the code; Mike reviews and watches. Keep changes reviewable, comment the 6502 code at the level of "why", and skip explanations of basics.
+Authorship: Mike has programmed 6502 machine language and assembler since childhood, but for now this project is 100% AI-written. Working style: Claude writes the code; Mike reviews and watches. Keep changes reviewable, comment the 6502 code at the level of "why", and skip explanations of basics.
 
 ---
 
@@ -225,10 +225,59 @@ Memory decoding:
 
 ---
 
+## 10a. Known ROM CRC32s (looked up, not taken from any one machine)
+
+Tape 3 is to identify ROMs by CRC32 against this table. It must not rely on
+the sums from one MiSTer's ROM files: a repaired machine can have mismatched
+chips, and nobody can simulate every variant. A ROM that matches no entry is
+reported as UNKNOWN; that covers patched, replacement (e.g. Altirra OS),
+failing and mis-socketed chips alike.
+
+Sources: atari800 emulator `src/sysrom.c` (whole images) and MAME
+`src/mame/atari/atari400.cpp` (per chip), both read 2026-11-07. The two are
+independent. Each set of MAME chip CRCs combines (CRC32 combine) exactly to
+the atari800 whole-image CRC, so the chip values are confirmed even though
+MAME marks them BAD_DUMP.
+
+400/800 OS: three chips. The CRC covers each chip's range as the CPU sees it.
+
+| Chip | Range | Rev A NTSC | Rev B NTSC | Rev A PAL |
+|---|---|---|---|---|
+| CO12399B | $D800-$DFFF | 6A5D766E | 6A5D766E | 6A5D766E |
+| E000 chip | $E000-$EFFF | 29F64E17 (CO12499A) | D818F3E8 (CO12499B) | 8E547F56 (CO15199) |
+| F000 chip | $F000-$FFFF | BC533F0C (CO14599A) | C1690A9B (CO14599B) | BE55B413 (CO15299) |
+| whole | $D800-$FFFF | C1B3BB02 | 0E86D61D | 72B3FED4 |
+
+XL/XE OS: one 16K image covering $C000-$FFFF. Its $D000-$D7FF holds the
+self-test, which the CPU sees at $5000-$57FF when PORTB bit 7 = 0.
+
+| Rev | CRC32 | Notes |
+|---|---|---|
+| 10 | C5C11546 | 1200XL (two 8K chips: $C000 0391386B, $E000 B502F1E7) |
+| 11 | 1A1D7B1B | 1200XL (two 8K chips: $C000 6E29EC8D, $E000 D73CE29A) |
+| 1 | 643BCC98 | 600XL (MAME) |
+| 2 | 1F9CD270 | 800XL, 65XE, 130XE (MAME) |
+| 3 | 29F133F7 | 800XE (MAME) |
+| 3A | 0D477AA1 | |
+| 3B | D425A9CF | |
+| 4 | 1EAF4002 | |
+| 5 | 0E000B99 | |
+| 59 | 45F47988 | MAME calls this "Rev. 3B ?" (Arabic 65XE) |
+| 59A | F0A236D3 | |
+
+BASIC, 8K at $A000:
+
+| Rev | CRC32 | Notes |
+|---|---|---|
+| A | 4BEC4DE2 | |
+| B | F0202FB3 | 600XL, 800XL (MAME CO60302A) |
+| C | 7D684184 | 65XE, 130XE, 800XE (MAME CO24947A) |
+| Arabic | C899F4D6 | MAME only (a65xea) |
+
 ## 11. To verify / open items
 
 - [ ] Bit-to-chip tables for the 400, 800 (per 16K board), 800XL and 130XE, from the schematics.
-- [ ] Known-good ROM checksum table (OS rev A/B, XL OS revisions, BASIC revisions, self-test).
+- [x] Known-good ROM table: see 10a. Tape 3 still shows raw sums until it switches to CRC32. Still missing: OS rev B PAL (if it exists), XEGS (32K image, MAME D50260D1).
 - [ ] Exact Atari800 folder path on the MiSTer share; MiSTer core 400/800 OS and RAM size options.
 - [ ] Android AspeQt cassette playback support.
 - [ ] Whether mrext Remote can launch and screenshot this core.
