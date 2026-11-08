@@ -1,6 +1,6 @@
 # Development
 
-Version 0.1.1. This is for anyone who wants to build the tapes from source,
+Version 0.1.2. This is for anyone who wants to build the tapes from source,
 change them, or check how they work. To test a machine you only need the `.cas` files in
 `cassettes/` and the [user guide](USER-GUIDE.md).
 
@@ -40,7 +40,11 @@ offline, or a tape in use) prints `NOT deployed` and the build goes on.
 FAST and fault builds are never copied.
 
 `tools/build.py` holds the list of tapes (`TAPES`) and the share path
-(`SHARE`). Some tapes need more than a plain assemble:
+(`SHARE`). Each tape that needs more than 8K has `NEEDPG`, the RAM it needs
+in pages ($40 = 16K, $80 = 32K). Its boot code compares that with the OS's
+RAMTOP ($6A) before it touches anything else, and halts below it (red
+border, the low tone on and off). So every tape runs on any machine with
+at least its RAM, and stops clearly on a smaller one. Some tapes need more than a plain assemble:
 - The one-load RAM tapes, 16k (`build_one16`) and 32k+ (`build_one32`):
   tape 1's stage 1 (ONE16) with stage 2 and, for 32k+, the system tests,
   inserted into the same image at the addresses they were built for, all
@@ -76,6 +80,8 @@ FAST and fault builds are never copied.
 scan line and a floating bus. It models:
 - the cassette boot, and later stages read through a stand-in for the OS's
   SIOV
+- RAMTOP ($6A) as the OS sizes it at power-on: `--ram`, capped at $A000
+  with `--basic`
 - RAM faults: stuck bits (`--stuck`), flaky bits (`--flaky`), mirrored banks
   (`--mirror`), and 130XE bank aliasing
 - XL/XE banking, the RAM under the OS, the 130XE banks, the self-test ROM

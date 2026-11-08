@@ -27,6 +27,33 @@ entry	sei
 	lda #$08
 	sta CONSOL
 
+	.ifdef NEEDPG
+; Too little RAM for this tape (NEEDPG pages; build.py): the OS loaded part
+; of the image into RAM that isn't there, so nothing past this point can
+; run. The OS sized the RAM at power-on (RAMTOP, $6A: a cartridge counts
+; as the end of RAM). Halt: red border and the low end tone, on and off,
+; for good. Use the tapes for a smaller machine (the 400 set fits all).
+	lda $6A
+	cmp #NEEDPG
+	bcs rm_ok
+	lda #C_RED
+	sta COLBK
+	lda #F_END
+	sta AUDF1
+	lda #AUD_ON		; 0.6 s on, 0.6 s off: 37 x 256 scan lines
+rm_tone	sta AUDC1		; each (no stack or RAM needed: X, Y only)
+	ldy #37
+rm_wy	ldx #0
+rm_wx	sta WSYNC
+	dex
+	bne rm_wx
+	dey
+	bne rm_wy
+	eor #AUD_ON^AUD_OFF	; on <-> off
+	jmp rm_tone
+rm_ok
+	.endif
+
 	ldx #0			; clear BSS (absolute,X: no zero page needed)
 	txa
 clr	sta BSS,x

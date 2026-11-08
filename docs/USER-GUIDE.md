@@ -1,8 +1,9 @@
 # A8 Cassette Diagnostics: User Guide
 
-Version 0.1.1
+Version 0.1.2
 
-These tapes test an Atari 400, 800, XL or XE. You load them like any
+These tapes test any Atari 8-bit computer: the 400, 800, 1200XL, 600XL,
+800XL, 65XE, 800XE, 130XE and XE Game System. You load them like any
 cassette program. They tell you what works and what doesn't, by colour and
 by beeps first, and with text on screen once the screen itself has been
 checked. So they're still useful when the picture is bad.
@@ -39,14 +40,16 @@ bottom of RAM and tests everything else from there.
 working disk drive. The cassette tapes stay as the version for low-spec and
 failing machines.
 
-**Several sets, because tape is slow.** A cassette loads at 600 baud: about
-3K a minute. So every tape is as small as it can be, and how you split the
-tests depends on how much RAM the machine has:
-- A **400 with 8K** gets five small tapes of about 2 minutes each. Each fits
-  in 8K and needs only what the tapes before it have tested.
-- A machine with **16K** loads two bigger tapes, about 3 minutes each.
-- An **800 with 32K or 48K, or any XL or XE**, loads one tape of about 6
-  minutes that does everything, RAM test included.
+**Several sets, because tape is slow.** A cassette loads at 600 baud:
+about 3K a minute. So the tests are split by how much RAM the machine has,
+and the more RAM, the fewer tapes:
+- **8K or more:** the 400 set, five small tapes of about 2 minutes each.
+- **16K or more:** the 16k set, two tapes of about 3.5 minutes each.
+- **32K or more:** the 32k+ tape, one tape of about 6 minutes.
+
+A set works on every machine with at least that much RAM, whatever the
+model. So any Atari can run the 400 set, and a 130XE can run all three.
+The bigger set is just quicker to get through.
 
 Within each set, every tape only relies on what an earlier one proved. For
 example, RAM is tested before anything else runs from it, and the keyboard
@@ -54,39 +57,59 @@ is tested before a test asks you a yes/no question.
 
 ## Which tapes for which machine
 
-| Your machine | Use these tapes, in this order |
-|---|---|
-| 400 with 8K | `diag-400-01-ram`, `-02-rom`, `-03-input`, `-04-ports`, `-05-av`; for a long test, `diag-400-memtest` |
-| 400 or 800 with 16K | `diag-16k-01-ram`, `diag-16k-02-system`; for a long test, `diag-memtest` |
-| 800 with 32K or 48K, any XL or XE | `diag-32k-xl-xe` (one tape does it all); for a long test, `diag-memtest` |
-| **any machine that won't get through its own set** | **the 400 set**: it only needs the first 8K of RAM to work |
-| keyboard, joysticks and paddles only (16K and up) | `diag-controls` |
+**Pick by RAM.** Use the biggest set your machine has the RAM for:
 
-Not sure how much RAM there is? Start with `diag-400-01-ram`: it measures
-the RAM and shows it on screen.
+| RAM | Tapes, in this order | Long test (optional) |
+|---|---|---|
+| 8K or more | the 400 set: `diag-400-01-ram`, `-02-rom`, `-03-input`, `-04-ports`, `-05-av` | `diag-400-memtest` |
+| 16K or more | the 16k set: `diag-16k-01-ram`, `diag-16k-02-system` | `diag-memtest` |
+| 32K or more | the 32k+ tape: `diag-32k-xl-xe` | `diag-memtest` |
+
+For the keyboard, joysticks and paddles only: `diag-controls` (16K or more).
+
+How much RAM the models came with (an upgraded machine counts what it
+has now):
+
+| Model | RAM |
+|---|---|
+| 400 | 8K or 16K |
+| 800 | 8K to 48K |
+| 600XL | 16K, or 64K with a 1064 memory module |
+| 1200XL, 800XL, 65XE, 800XE, XE Game System | 64K |
+| 130XE | 128K |
+
+Not sure how much RAM there is? Load `diag-400-01-ram`: it runs on every
+Atari and shows the RAM it found. Or just try a bigger tape: one that needs
+more RAM than the machine has stops at once with a red border and a low
+tone, on and off (see [Colours](#colours)).
+
+**When a machine won't get through its own set**, use the 400 set: it
+needs only the first 8K of RAM to work, so it's the fallback for every
+machine.
 
 All the tapes:
 
-| Tape | Load time | Needs | Tests |
+| Tape | Needs | Load time | Tests |
 |---|---|---|---|
-| `diag-400-01-ram` | 2 min, then 1.5 min for part 2 | 8K | the video check and all the RAM; part 2 (16K and up) the RAM the tape itself used, the RAM under an XL/XE's OS and a 130XE's extra RAM |
-| `diag-400-02-rom` | 2 min | 8K | test 1, the ROMs |
-| `diag-400-03-input` | 2 min | 8K | tests 2 and 3, the keyboard and the console keys |
-| `diag-400-04-ports` | 2 min | 8K | tests 5 and 6, the joysticks and the paddles |
-| `diag-400-05-av` | 2 min | 8K | tests 4 and 7, the sound (POKEY) and the video (GTIA) |
-| `diag-400-memtest` | 2 min | 8K | the memory test, until you stop it |
-| `diag-16k-01-ram` | 3.5 min | 16K | the RAM test in one load, the tape's own RAM included |
-| `diag-16k-02-system` | 3.5 min | 16K | tests 1-7, with a menu |
-| `diag-32k-xl-xe` | 6 min | 32K | the whole RAM test, then tests 1-7 with a menu, in one load |
-| `diag-memtest` | 2.5 min | 16K | the memory test, until you stop it |
-| `diag-controls` | 2 min | 16K | the keyboard, joystick and paddle tests only |
+| `diag-400-01-ram` | 8K | 2 min, then 1.5 min for part 2 | the video check and all the RAM. Part 2 (machines with 16K or more): the RAM the tape itself used, the RAM under an XL/XE's OS and a 130XE's extra RAM |
+| `diag-400-02-rom` | 8K | 2 min | test 1, the ROMs |
+| `diag-400-03-input` | 8K | 2 min | tests 2 and 3, the keyboard and the console keys |
+| `diag-400-04-ports` | 8K | 2 min | tests 5 and 6, the joysticks and the paddles |
+| `diag-400-05-av` | 8K | 2 min | tests 4 and 7, the sound (POKEY) and the video (GTIA) |
+| `diag-400-memtest` | 8K | 2 min | the memory test, until you stop it (main RAM only) |
+| `diag-16k-01-ram` | 16K | 3.5 min | the whole RAM test in one load: all the RAM, the tape's own, under an XL/XE's OS, and a 130XE's extra RAM |
+| `diag-16k-02-system` | 16K | 3.5 min | tests 1-7, with a menu |
+| `diag-32k-xl-xe` | 32K | 6 min | the whole RAM test, then tests 1-7 with a menu, in one load |
+| `diag-memtest` | 16K | 2.5 min | the memory test, until you stop it (all the RAM) |
+| `diag-controls` | 16K | 2 min | tests 2, 5 and 6 only: keyboard, joysticks, paddles |
 
 `diag-controls` is a companion to Atari's SALT diagnostic disks: their
 controller tests need a test harness plugged in, and this tape doesn't.
 
 `diag-400-01-ram-part2` is the second part of the 400 RAM tape as a file of
-its own. A 400 with 8K never loads it; a bigger machine running the 400 set
-does. You only need it with a player that can't wait between the two parts
+its own. A machine with 8K never loads it (the screen says
+`STAGE 2: 16K ONLY. NEXT: DIAG-400-02-ROM`); a bigger machine running the
+400 set does. You only need it with a player that can't wait between the two parts
 (see [AspeQt](#from-a-pc-usb-sio-interface-and-aspeqt)).
 
 ## Loading a tape
@@ -139,7 +162,8 @@ To play a tape:
 AspeQt can't rewind or pause a tape. On a machine with 16K or more,
 `diag-400-01-ram` is a **two-part tape**: the first part runs its RAM test
 for a few minutes before it asks for part two, and by then AspeQt has
-played past it. The screen then says `STAGE 2: NOT ON TAPE` or `ERROR`.
+played past it. The screen then says `STAGE 2: NOT ON TAPE` or
+`STAGE 2: ERROR` and a number.
 When that happens, play `diag-400-01-ram-part2.cas` and press START on the
 Atari: it tries again. Every other tape is a single part and doesn't have
 this problem.
@@ -161,8 +185,9 @@ name, not what it found out about your machine.
 What the tape **found** is on the line below it: `FOUND:`, then the machine
 type (400/800 or XL/XE), all the RAM it found (an 800XL shows 64K, a 130XE
 128K), PAL or NTSC, and `CART IN` if a cartridge is plugged in. So the
-32k+ tape on an 800 with 48K shows `DIAG-32K-XL-XE` on top and
-`FOUND: 400/800  RAM 48K  NTSC` below.
+32k+ tape on a 130XE shows `DIAG-32K-XL-XE` on top and
+`FOUND: XL/XE  RAM 128K  NTSC` below. The same tape on an 800 shows
+`FOUND: 400/800`.
 
 ### Colours
 
@@ -178,6 +203,11 @@ unreadable or the screen is switched off:
 | ![](img/color-red-flash.png) | bright red flash | `#D15D57` | a fault beep (see the beep code below) |
 | ![](img/color-purple.png) | purple | `#AD3C9F` | waiting for you: a question to answer, or the video check's last chance |
 | | black | `#000000` | the short gap between two flashes, and the moment after you answer a question |
+
+**Red border with a low tone on and off, straight after loading, and
+nothing else:** the machine has less RAM than this tape needs. That isn't a
+fault: use the set for its RAM (see
+[Which tapes](#which-tapes-for-which-machine)).
 
 On the text screens the text is light grey (`#CBC3D0`) on black.
 
@@ -204,6 +234,9 @@ Example: **long, long, pause, short ×5, low** = bank 2, bit D4.
 A single long beep then the low beep, with no short beeps and no picture,
 means the tape didn't load correctly into RAM (a bad image checksum): see
 [When something fails](#when-something-fails).
+
+Only the low beep, on and off with no long or short beeps, means this tape
+needs more RAM than the machine has.
 
 The test numbers are the same on every tape: 1 ROMs, 2 keyboard, 3 console
 keys, 4 POKEY, 5 joysticks, 6 paddles, 7 GTIA. On `diag-32k-xl-xe`, 8 is
@@ -256,7 +289,7 @@ machine with a lot of RAM this takes a few minutes.
 1. What the tape found.
 2. The bank being tested now.
 
-**Result** (the 400 tape; the 16K and 32K tapes go straight on to the
+**Result** (the 400 tape; the 16k and 32k+ tapes go straight on to the
 summary below).
 
 ![RAM test passed](img/ram-03-pass.png)
@@ -349,8 +382,8 @@ too:
    `*`, so those keys carry the arrows. CONTROL lights only together with
    another key: the Atari can't see CONTROL on its own.
 2. The legend.
-3. How many keys are left. HELP and F1-F4 (XL/1200XL) show but aren't
-   required.
+3. How many keys are left. HELP (XL/XE) and F1-F4 (1200XL) show but
+   aren't required.
 
 Press START when you're done. If keys are missing, the result screen shows
 the pressed keys in inverse, so the missing ones stand out:
@@ -449,9 +482,9 @@ Running a test again replaces its old result.
 1. Every test: PASS, FAIL and its items, or `-` if not run.
 2. The ROMs (see [ROMs](#roms-diag-400-02-rom-test-1-on-the-system-tapes)).
 
-### The 32K and XL/XE tape (`diag-32k-xl-xe`)
+### The 32k+ tape (`diag-32k-xl-xe`)
 
-One tape, one load, for an 800 with 32K or 48K and every XL and XE:
+One tape, one load, for any machine with 32K or more:
 1. The RAM test: everything above the program gets the full test.
 2. The program's own RAM, page by page: each page is moved into the screen
    (the top rows show a jumble for a moment), tested, and put back.
@@ -508,6 +541,15 @@ bit: in which pass it first failed, and in how many passes since. A bit
 that failed every time is **solid**; one that only fails sometimes is
 **intermittent**.
 
+What each one covers:
+- **`diag-memtest`** (16K or more): all the RAM. That's main RAM, the RAM
+  under an XL/XE's OS, and a 130XE's extra RAM. The one exception is the
+  last page under the OS, $FF00-$FFFF, which holds the memory test's own
+  interrupt vectors while the OS is switched out. The RAM tapes test that
+  page.
+- **`diag-400-memtest`** (8K or more): main RAM only. On an XL/XE, use
+  `diag-memtest` for the rest.
+
 ![Memory test running](img/memtest-01-running.png)
 
 1. The pass number and how long it has run.
@@ -559,7 +601,9 @@ inverted, held for two frames, checked, put back and checked again.
   - no green chirp after loading: the RAM the tape loaded into is bad
   - one long beep then the low beep, with no picture: the tape didn't load
     into RAM correctly
-  - `BANK 1 BAD: USE THE 400 SET`
+  - a crash or a hang (the border stays yellow and silent) partway through
+- **Red border and the low tone on and off, right after loading:** not a
+  fault. The tape needs more RAM than the machine has; use a smaller set.
 - **A tape that won't load at all**, or a BOOT ERROR, also points at the
   first part of RAM, or the cassette or SIO connection.
 

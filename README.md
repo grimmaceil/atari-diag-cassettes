@@ -1,6 +1,7 @@
 # A8 Cassette Diagnostics
 
-Diagnostic tapes for the Atari 400, 800, XL and XE computers. Load one like
+Diagnostic tapes for every Atari 8-bit computer: the 400, 800, 1200XL,
+600XL, 800XL, 65XE, 800XE, 130XE and XE Game System. Load one like
 any cassette program and it tests the machine: RAM, ROMs, keyboard, console
 keys, joysticks, paddles, sound and video, plus a memory test (burn-in) for faults that
 come and go.
@@ -12,25 +13,29 @@ checked.
 **Why cassette:** a cassette boot needs the least of the machine: no disk
 drive, no DOS, just the computer, its OS and the first few K of RAM. So it
 runs on an 8K Atari 400 and on machines too sick to boot a disk. Tape is
-slow (about 3K a minute), so there are several sets, one per RAM size, each
-as few and as short loads as that much RAM allows. **A disk version is
+slow (about 3K a minute), so there are three sets, by RAM size: the more
+RAM, the fewer tapes. Each set works on every machine with at least that
+much RAM, newer models included. **A disk version is
 planned**, for faster loading on machines with a working drive.
 
-Version 0.1.1.
+Version 0.1.2.
 
 ![The menu](docs/img/system-01-menu.png)
 
 ## Get started
 
-1. Pick the tapes for your machine:
+1. Pick the tapes by RAM: the biggest set the machine has the RAM for.
 
-   | Your machine | Tapes (in `cassettes/`) |
+   | RAM | Tapes (in `cassettes/`) |
    |---|---|
-   | 400 with 8K | `diag-400-01-ram` to `diag-400-05-av` (about 2 min each), then `diag-400-memtest` |
-   | 400/800 with 16K | `diag-16k-01-ram`, `diag-16k-02-system` (about 3.5 min each), `diag-memtest` |
-   | 800 with 32K-48K, XL, XE | `diag-32k-xl-xe` (one tape, about 6 min), `diag-memtest` |
-   | anything that won't get through its own set | the 400 set |
-   | keyboard, joysticks, paddles only (16K+) | `diag-controls`: no test harness needed; goes with Atari's SALT disks |
+   | 8K or more (every Atari) | the 400 set: `diag-400-01-ram` to `diag-400-05-av`, about 2 min each; long test `diag-400-memtest` |
+   | 16K or more | the 16k set: `diag-16k-01-ram`, `diag-16k-02-system`, about 3.5 min each; long test `diag-memtest` |
+   | 32K or more (an 800 with 32K-48K, any 64K or 128K XL/XE) | the 32k+ tape: `diag-32k-xl-xe`, one tape, about 6 min; long test `diag-memtest` |
+   | keyboard, joysticks, paddles only (16K or more) | `diag-controls`: no test harness needed; goes with Atari's SALT disks |
+
+   A machine that won't get through its own set: use the 400 set. A tape
+   that needs more RAM than the machine has stops at once: red border, a
+   low tone on and off.
 
 2. Take out any cartridge, then load the first tape: hold START, switch the
    machine on, start the tape and press a key when it beeps. You can
@@ -44,6 +49,13 @@ and beeps, loading from a PC, and what to do when something fails.
 
 ## Versions
 
+- **0.1.2** (2026-11-08)
+  - Every tape that needs more than 8K checks the RAM first. On a machine
+    with too little it stops at once, with a red border and a low tone on
+    and off, instead of giving a meaningless code.
+  - The documents pick tapes by RAM, for every Atari 8-bit model.
+  - The leftover code of the old 48k+ tape is gone (the other tapes are
+    unchanged by that).
 - **0.1.1** (2026-11-08)
   - The 16k RAM tape and the 32k+ tape (it replaces the 48k+ tape) are one
     load each, and test their own RAM too. The 32k+ menu has `0 RAM TEST

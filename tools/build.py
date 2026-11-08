@@ -33,6 +33,11 @@ SHARE = Path('//TRUENAS/Media/games/ATARI800/_diag')   # the tapes, in the MiSTe
 ALL7 = dict(WANT_ROM=1, WANT_KB=1, WANT_CON=1, WANT_JOY=1, WANT_PAD=1,
             WANT_POK=1, WANT_GTIA=1)
 S400 = {'SETNO': 0}
+# NEEDPG: the RAM a tape needs, in pages. Below it the tape halts at once
+# (boot.asm): red border, the low tone on and off. Every tape runs on any
+# machine with at least that much RAM, the bigger and newer ones included.
+# The 400 set needs 8K, which every Atari has, so it has no check.
+N16 = {'NEEDPG': '$40'}
 TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
          ('system', 'diag-400-02-rom', ['main.asm'], dict(S400, TAPENO=2, WANT_ROM=1)),
          ('system', 'diag-400-03-input', ['main.asm'],
@@ -41,14 +46,14 @@ TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
           dict(S400, TAPENO=4, WANT_JOY=1, WANT_PAD=1)),
          ('system', 'diag-400-05-av', ['main.asm'],
           dict(S400, TAPENO=5, WANT_POK=1, WANT_GTIA=1)),
-         ('one16', 'diag-16k-01-ram', [], {}),
+         ('one16', 'diag-16k-01-ram', [], N16),
          ('system', 'diag-16k-02-system', ['main.asm'],
-          dict(ALL7, SETNO=1, TAPENO=2, MENU=1, BIGSTAGE=1)),
-         ('one32', 'diag-32k-xl-xe', [], {}),
+          dict(ALL7, **N16, SETNO=1, TAPENO=2, MENU=1, BIGSTAGE=1)),
+         ('one32', 'diag-32k-xl-xe', [], {'NEEDPG': '$80'}),
          ('system', 'diag-controls', ['main.asm'],
-          dict(SETNO=3, WANT_KB=1, WANT_JOY=1, WANT_PAD=1, BIGSTAGE=1)),
+          dict(N16, SETNO=3, WANT_KB=1, WANT_JOY=1, WANT_PAD=1, BIGSTAGE=1)),
          ('tape2', 'diag-400-memtest', ['main.asm'], {'OWNTEST': 1, 'NOXL': 1, 'NORAMK': 1}),
-         ('bounce', 'diag-memtest', [], {'BOUNCE': 1, 'BIGSTAGE': 1, 'OWNTEST': 1})]
+         ('bounce', 'diag-memtest', [], dict(N16, BOUNCE=1, BIGSTAGE=1, OWNTEST=1))]
 
 
 def mads(src, asm, out, defines):

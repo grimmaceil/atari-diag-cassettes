@@ -1,6 +1,6 @@
 # A8 Cassette Diagnostics: Project Brief
 
-Multi-stage, cassette-loaded diagnostic suite for Atari 8-bit computers (400, 800, 800XL; 130XE extended RAM as an optional stage). The goal is to give as much diagnostic information as possible through synchronized beeps and border flashes, adding plain-text screens as the video hardware proves itself.
+Cassette-loaded diagnostic suite for every Atari 8-bit computer: the 400, 800, 1200XL, 600XL, 800XL, 65XE, 800XE, 130XE and XE Game System. Each set of tapes is built for a minimum amount of RAM and runs on every machine with at least that much, newer models included (a tape halts with a clear signal on a machine with less). The goal is to give as much diagnostic information as possible through synchronized beeps and border flashes, adding plain-text screens as the video hardware proves itself.
 
 Authorship: Mike has programmed 6502 machine language and assembler since childhood, but for now this project is 100% AI-written. Working style: Claude writes the code; Mike reviews and watches. Keep changes reviewable, comment the 6502 code at the level of "why", and skip explanations of basics.
 
@@ -14,6 +14,12 @@ Authorship: Mike has programmed 6502 machine language and assembler since childh
 | 800 | Up to 48K, three 16K boards in slots | Slot position sets each board's address range; OS rev A/B on removable OS board |
 | 800XL | 64K, eight 4164 DRAMs (U9-U16), one chip per data bit | Verify the exact bit-to-U mapping against the schematic |
 | 130XE | 64K main + 64K extended (4 x 16K banks) | Different DRAM layout; needs its own chip table |
+| 1200XL | 64K | No BASIC built in; F1-F4 and HELP keys; two 8K OS chips |
+| 600XL | 16K (64K with the 1064 expansion) | Same MMU and PORTB banking as the 800XL |
+| 65XE, 800XE | 64K | 800XL-compatible |
+| XE Game System | 64K | Built-in BASIC and Missile Command (PORTB bit 6); detachable keyboard |
+
+Sets by RAM, not by model: the 400 set needs 8K, the 16k set and `diag-controls` and `diag-memtest` need 16K, `diag-32k-xl-xe` needs 32K. Every tape works on any machine with at least that much RAM. The tapes that need more than 8K check the OS's RAMTOP ($6A) before anything else and halt below it (`NEEDPG` in build.py, boot.asm): red border, the low tone 0.6 s on and 0.6 s off, for good.
 
 Memory decoding:
 - **400/800:** a fixed memory map decoded by discrete TTL. No software banking. The cart sets RD5 (left, $A000-$BFFF) or RD4 ($8000-$9FFF), which disables RAM there and asserts S5/S4.
@@ -337,11 +343,11 @@ the machine can't hold, and it loads in as few steps as the RAM allows.
 
 | Set | For | Layout |
 |---|---|---|
-| `diag-400-*` (built) | 8K 400 | Each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. The tests are split logically and run progressively: 01 RAM, 02 ROMs (test 1), 03 input (tests 2-3), 04 ports (5-6), 05 sound and video (4, 7). Later tapes rely only on what earlier ones proved: the Y/N answers come from keys already tested. |
-| `diag-16k-*` (built) | 16K 400/800 | 01 RAM, one load (build_one16): stage 1 (ONE16) tests the RAM above the image, then stage 2, inserted in the same image, page-tests stage 1's RAM through the screen block (`src/common/pagetest.asm`) and shows the summary; START reruns from stage 1's `again`. 02 system: all seven tests in one 72-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; ALL runs every test). |
-| `diag-32k-xl-xe` (built) | 32K/48K 800, XL/XE | One load, 142 records (build_one32): stage 1 at $0800, stage 2 at $1A00, the system tests at $2C00, shared BSS $4F00, screen $5000 (display list $53C0). Stage 1 tests the RAM above the image; stage 2 page-tests the image's RAM, then the RAM under the OS and the 130XE banks; then the system tests and menu, with RAM faults as test 8 and menu key 0 (RAMAGAIN) rerunning stage 1. The ROM test turns ANTIC off while the self-test ROM covers $5000-$57FF. It replaced the 48k+ tape (`build_oneload`, kept in build.py but not built). |
-| `diag-controls` (built) | 16K+ | The keyboard, joystick and paddle tests only (SETNO 3), no harness: a companion to the SALT disks. |
-| `diag-400-memtest`, `diag-memtest` (built) | 8K / 16K+ | The memory test (burn-in), one load each. The 8K one (OWNTEST, NOXL, NORAMK) re-checks its own image sum every pass. It then page-tests its own RAM: each page is saved in the screen block, given March C- and an address-in-page test, restored and read back. The screen block gets a visible sweep: each row inverted, held two frames, checked, restored and checked. Both are position-independent routines (branches and (zp),y only) copied to $0400-$04FF. The 16K+ one (BOUNCE) swaps between two relocated copies every pass, $20 pages apart on the 400/800 and at $8000 on the XL/XE, so its own RAM gets the full tests too. It falls back to the page test when copy B doesn't fit (16K). Not covered: page $FF under the XL/XE OS. |
+| `diag-400-*` (built) | 8K and up: every Atari | Each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. The tests are split logically and run progressively: 01 RAM, 02 ROMs (test 1), 03 input (tests 2-3), 04 ports (5-6), 05 sound and video (4, 7). Later tapes rely only on what earlier ones proved: the Y/N answers come from keys already tested. |
+| `diag-16k-*` (built) | 16K and up | 01 RAM, one load (build_one16): stage 1 (ONE16) tests the RAM above the image, then stage 2, inserted in the same image, page-tests stage 1's RAM through the screen block (`src/common/pagetest.asm`) and shows the summary; START reruns from stage 1's `again`. 02 system: all seven tests in one 72-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; ALL runs every test). |
+| `diag-32k-xl-xe` (built) | 32K and up: an 800 with 32K-48K, every XL/XE but a 16K 600XL | One load, 142 records (build_one32): stage 1 at $0800, stage 2 at $1A00, the system tests at $2C00, shared BSS $4F00, screen $5000 (display list $53C0). Stage 1 tests the RAM above the image; stage 2 page-tests the image's RAM, then the RAM under the OS and the 130XE banks; then the system tests and menu, with RAM faults as test 8 and menu key 0 (RAMAGAIN) rerunning stage 1. The ROM test turns ANTIC off while the self-test ROM covers $5000-$57FF. It replaced the earlier 48k+ tape, whose code is removed. |
+| `diag-controls` (built) | 16K and up | The keyboard, joystick and paddle tests only (SETNO 3), no harness: a companion to the SALT disks. |
+| `diag-400-memtest`, `diag-memtest` (built) | 8K and up / 16K and up | The memory test (burn-in), one load each. The 8K one (OWNTEST, NOXL, NORAMK) re-checks its own image sum every pass. It then page-tests its own RAM: each page is saved in the screen block, given March C- and an address-in-page test, restored and read back. The screen block gets a visible sweep: each row inverted, held two frames, checked, restored and checked. Both are position-independent routines (branches and (zp),y only) copied to $0400-$04FF. The 16K+ one (BOUNCE) swaps between two relocated copies every pass, $20 pages apart on the 400/800 and at $8000 on the XL/XE, so its own RAM gets the full tests too. It falls back to the page test when copy B doesn't fit (16K). Not covered: page $FF under the XL/XE OS. |
 
 The system tapes are built from one `src/system/main.asm`, with a file per
 test (`t_rom`, `t_kb`, `t_con`, `t_joy`, `t_pad`, `t_pok`, `t_gtia`). The
@@ -395,8 +401,7 @@ Open: which of these are wanted, and in what order; whether the remaining
 
 ## 14. Status at v0.1.1 (2026-11-08)
 
-Every tape has passed on the MiSTer Atari800 core: the 400 set, the 16k
-set, `diag-32k-xl-xe` (800XL rev 2 OS with 64K, and a 130XE setup with
-128K), both memory tests and `diag-controls`. Not yet run on real
-hardware. Tape is the low-spec version; a disk version is planned, for
+Every tape has passed on the MiSTer Atari800 core, in the core's 400, 800,
+XL and XE setups (most recently an 800XL with the rev 2 OS and 64K, and a
+130XE with 128K). Not yet run on real hardware. Tape is the low-spec version; a disk version is planned, for
 faster loading on machines with a working drive.

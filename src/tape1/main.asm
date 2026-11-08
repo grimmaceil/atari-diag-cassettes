@@ -500,7 +500,7 @@ s_toggle dta d'START=GO ON SELECT=RE-BEEP OPTION=FLASH',$FF
 s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
 s_l2load dta d'LOADING STAGE 2...',$FF
 s_l2pre	dta d'STAGE 2: ',$FF
-s_l2_8k	dta d'NEEDS 16K. NEXT: 400 TAPE 02',$FF
+s_l2_8k	dta d'16K ONLY. NEXT: DIAG-400-02-ROM',$FF
 s_l2_bad dta d'NOT LOADED, BANK 1 FAILED',$FF
 s_l2_big dta d'TOO BIG',$FF
 s_l2_sio dta d'ERROR $',$FF

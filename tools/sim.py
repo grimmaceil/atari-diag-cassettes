@@ -656,6 +656,9 @@ def main():
                     float(prob))
     for i in range(0x800):                 # OS state that must survive
         hw.ram[i] = (i * 7 + 3) & 0xFF
+    # RAMTOP ($6A), as the OS sized it at power-on: the RAM, up to $C000,
+    # and $A000 with BASIC or a cartridge in (the tapes' NEEDPG check)
+    hw.ram[0x6A] = min(a.ram, 0xC000, 0xA000 if a.basic else 0xC000) >> 8
     lowram_before = bytes(hw.ram[:0x800])
     hw.ram[load:load + len(img)] = img
 
