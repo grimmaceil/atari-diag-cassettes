@@ -507,7 +507,7 @@ romline	stx MTMP
 	lda #<s_unkb
 	ldy #>s_unkb
 	bne rl_p
-rl_k	cmp #15			; an OS name (0-14): "REV " first
+rl_k	cmp #18			; an OS or BASIC rev (0-17): "REV " first
 	bcs rl_nr
 	pha
 	lda #<s_rev
@@ -639,10 +639,10 @@ n_r4	dta d'4',$FF
 n_r5	dta d'5',$FF
 n_r59	dta d'59 (3B?)',$FF
 n_r59a	dta d'59A',$FF
-n_basa	dta d'BASIC REV A',$FF
-n_basb	dta d'BASIC REV B',$FF
-n_basc	dta d'BASIC REV C',$FF
-n_basar	dta d'BASIC ARABIC',$FF
+n_basa	dta d'A',$FF
+n_basb	dta d'B',$FF
+n_basc	dta d'C',$FF
+n_basar	dta d'ARABIC',$FF
 n_bascar dta d'A, .CAR MISLOAD',$FF
 s_rev	dta d'REV ',$FF
 s_unk	dta d'UNKNOWN'*,$FF

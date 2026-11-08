@@ -200,6 +200,21 @@ tresult	jsr tshow
 	ldx TEST
 	lda BADMASK,x
 	bne tr_fail
+	.ifdef WANT_ROM
+	cpx #1			; the ROMs: a pass waits too, to read the sums
+	bne tr_ps
+	stx ENDING		; (report.asm's pass: no going on by itself)
+	stx NBANKS		; (one flash)
+	lda #<tr_go
+	sta CONTVEC
+	lda #>tr_go
+	sta CONTVEC+1
+	jmp pass
+tr_go	lda #0
+	sta ENDING
+	jmp (NEXTVEC)
+tr_ps
+	.endif
 	lda NEXTVEC
 	sta CONTVEC
 	lda NEXTVEC+1
@@ -273,8 +288,17 @@ ts_on	lda #21
 	lda #<s_pass
 	ldy #>s_pass
 	jsr puts
+	.ifdef WANT_ROM
+	ldx TEST		; (the ROMs wait for a press)
+	dex
+	beq ts_go
+	.endif
 	PRINT 23, 0, s_tpass
 ts_x	rts
+	.ifdef WANT_ROM
+ts_go	PRINT 23, 0, s_toggle
+	rts
+	.endif
 ts_fail	lda #<s_fail
 	ldy #>s_fail
 	jsr puts

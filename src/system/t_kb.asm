@@ -367,7 +367,7 @@ kbrtab	.word kbrow0, kbrow1, kbrow2, kbrow3, kbrow4
 
 s_kb1	dta d'PRESS EVERY KEY. START ENDS THE TEST.',$FF
 s_kb2	dta d'PLAIN=TO DO  INVERSE=DONE  BLINK=HELD',$FF
-s_kb3	dta d'INVERSE: PRESSED. NORMAL: NOT PRESSED',$FF
+s_kb3	dta d'INVERSE = PRESSED',$FF
 KL_DONE	= 5*40+13		; the legend's INVERSE=DONE, as a keyboard offset
 s_stuck	dta d'A KEY WAS DOWN AT THE START: STUCK?'*,$FF
 s_kleft	dta d'KEYS LEFT ',$FF
