@@ -473,7 +473,7 @@ class Auto:
                 else:                         # START: ALL at first, then (walk)
                     self.hw.press(when, 'CON', 1)            # the results
             return
-        if 'START=GO ON' in text:    # a failed test's code: go on (a press only
+        if 'START=GO ON' in text or 'START=SYSTEM TESTS' in text:    # a failed test's code: go on (a press only
             ln = self.hw.line        # counts in a pause, so keep pressing)
             if not any(e > ln for st, e, k, v in self.hw.presses if k == 'CON'):
                 self.hw.press(ln + 4000, 'CON', 1)
@@ -666,7 +666,8 @@ def main():
     insert_at = to_line(a.insert[0]) if a.insert else None
     frame = 0
     auto = Auto(hw, [d for d in a.deny.split(',') if d], a.skip, a.menuwalk,
-                [WALK[[1, 2, 3, 5, 6, 4, 7].index(int(c))] for c in a.walk] if a.walk else None,
+                [0x32 if c == '0' else WALK[[1, 2, 3, 5, 6, 4, 7].index(int(c))]
+                 for c in a.walk] if a.walk else None,
                 a.skiponce) if a.auto else None
     next_auto = 0
     while True:

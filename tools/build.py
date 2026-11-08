@@ -40,14 +40,14 @@ TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
           dict(S400, TAPENO=4, WANT_JOY=1, WANT_PAD=1)),
          ('system', 'diag-400-05-av', ['main.asm'],
           dict(S400, TAPENO=5, WANT_POK=1, WANT_GTIA=1)),
-         ('tape1', 'diag-16k-01-ram', ['main.asm', 'stage2.asm'], {}),
+         ('one16', 'diag-16k-01-ram', [], {}),
          ('system', 'diag-16k-02-system', ['main.asm'],
           dict(ALL7, SETNO=1, TAPENO=2, MENU=1, BIGSTAGE=1)),
-         ('oneload', 'diag-48k-xl-xe', [], dict(ALL7, SETNO=2, MENU=1)),
+         ('one32', 'diag-32k-xl-xe', [], {}),
          ('system', 'diag-controls', ['main.asm'],
           dict(SETNO=3, WANT_KB=1, WANT_JOY=1, WANT_PAD=1, BIGSTAGE=1)),
-         ('tape2', 'diag-400-burnin', ['main.asm'], {'OWNTEST': 1, 'NOXL': 1}),
-         ('bounce', 'diag-burnin', [], {'BOUNCE': 1, 'BIGSTAGE': 1, 'OWNTEST': 1})]
+         ('tape2', 'diag-400-memtest', ['main.asm'], {'OWNTEST': 1, 'NOXL': 1, 'NORAMK': 1}),
+         ('bounce', 'diag-memtest', [], {'BOUNCE': 1, 'BIGSTAGE': 1, 'OWNTEST': 1})]
 
 
 def mads(src, asm, out, defines):
@@ -166,6 +166,73 @@ def build_bounce(name, defines, label):
     return [Path(f'{out}.cas')]
 
 
+def build_one16(name, defines, label):
+    """The one-load 16k RAM tape: tape 1's stage 1 (ONE16) with stage 2
+    inserted at PAYAT, built to run there. Stage 1's BSS and TSTART depend
+    on stage 2's size, and stage 2 on those, but no size depends on an
+    address: two rounds settle it."""
+    out = BUILD / name
+    s2, pay = Path(f'{out}.s2'), BUILD / 'payload16.bin'
+    pay.write_bytes(bytes(0x1000))
+    d1 = dict(defines, ONE16=1)
+    mads('tape1', 'main.asm', out, d1)
+    s1 = labels(f'{out}.lab')
+    for _ in range(4):
+        d2 = dict(defines, ONE16=1, S2AT=f"${s1['PAYAT']:04X}", S1AGAIN=f"${s1['AGAIN']:04X}",
+                  S1BSS=f"${s1['BSS']:04X}", S1TSTART=f"${s1['TSTART']:02X}")
+        mads('tape1', 'stage2.asm', s2, d2)
+        pay.write_bytes(Path(f'{s2}.bin').read_bytes())
+        mads('tape1', 'main.asm', out, d1)
+        new = labels(f'{out}.lab')
+        if (new['BSS'], new['PAYAT']) == (s1['BSS'], s1['PAYAT']):
+            break
+        s1 = new
+    else:
+        sys.exit('build_one16: did not settle')
+    subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
+                    '--boot', f'{out}.bin', f'{out}.lab', '--name', label], check=True)
+    return [Path(f'{out}.cas')]
+
+
+def build_one32(name, defines, label):
+    """The one-load 32k+ tape: tape 1's stage 1 (ONE16, ONE32) with, at
+    PAYAT, stage 2 and then the system tests (SYSAT), all three sharing
+    stage 1's BSS page. No size depends on an address: a few rounds settle
+    the addresses."""
+    out = BUILD / name
+    s2, sy, pay = Path(f'{out}.s2'), Path(f'{out}.sys'), BUILD / 'payload16.bin'
+    pay.write_bytes(bytes(0x4000))
+    d1 = dict(defines, ONE16=1, ONE32=1)
+    mads('tape1', 'main.asm', out, d1)
+    s1 = labels(f'{out}.lab')
+    sysat = s1['PAYAT'] + 0x1200
+    for _ in range(5):
+        common = dict(S1BSS=f"${s1['BSS']:04X}", S1TSTART=f"${s1['TSTART']:02X}",
+                      S1AGAIN=f"${s1['AGAIN']:04X}")
+        d2 = dict(d1, S2AT=f"${s1['PAYAT']:04X}", SYS32=f'${sysat:04X}', **common)
+        mads('tape1', 'stage2.asm', s2, d2)
+        b2 = Path(f'{s2}.bin').read_bytes()
+        sysat = s1['PAYAT'] + len(b2)
+        d2['SYS32'] = f'${sysat:04X}'
+        mads('tape1', 'stage2.asm', s2, d2)
+        b2 = Path(f'{s2}.bin').read_bytes()
+        dsy = dict(ALL7, SETNO=4, MENU=1, CHAIN=1, SYSAT=f'${sysat:04X}',
+                   SHAREBSS=f"${s1['BSS']:04X}", PREVBSS=f"${s1['BSS']:04X}",
+                   RAMAGAIN=f"${s1['AGAIN']:04X}")
+        mads('system', 'main.asm', sy, dsy)
+        pay.write_bytes(b2 + Path(f'{sy}.bin').read_bytes())
+        mads('tape1', 'main.asm', out, d1)
+        new = labels(f'{out}.lab')
+        if (new['BSS'], new['PAYAT']) == (s1['BSS'], s1['PAYAT']):
+            break
+        s1 = new
+    else:
+        sys.exit('build_one32: did not settle')
+    subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
+                    '--boot', f'{out}.bin', f'{out}.lab', '--name', label], check=True)
+    return [Path(f'{out}.cas')]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--fault', help='BANK,BIT[,EVERY]  (bank 0 = low RAM; EVERY: burn-in '
@@ -180,6 +247,12 @@ def main():
         d = dict(defs, FAST=1) if a.fast else dict(defs)
         if src == 'oneload':
             cas += build_oneload(name, d, f'A8 {name.upper()}')
+            continue
+        if src == 'one32':
+            cas += build_one32(name, d, f'A8 {name.upper()}')
+            continue
+        if src == 'one16':
+            cas += build_one16(name, d, f'A8 {name.upper()}')
             continue
         if src == 'bounce':
             cas += build_bounce(name, d, f'A8 {name.upper()}')

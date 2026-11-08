@@ -35,9 +35,6 @@ t_rom	lda #1
 	lda #<s_t1
 	ldy #>s_t1
 	jsr tpage
-	lda DISPOK
-	beq tr_rd
-	PRINT 5, 0, s_rread
 tr_rd	lda #0
 	sta ROMHAVE
 
@@ -100,7 +97,6 @@ tr_show	lda DISPOK
 	jsr clrrow
 	lda #5
 	jsr rominfo
-	PRINT 13, 0, s_rnote
 tr_end	jmp tend
 
 ; osread: the OS CRCs into OSCRC.
@@ -511,7 +507,14 @@ romline	stx MTMP
 	lda #<s_unkb
 	ldy #>s_unkb
 	bne rl_p
-rl_k	asl
+rl_k	cmp #15			; an OS name (0-14): "REV " first
+	bcs rl_nr
+	pha
+	lda #<s_rev
+	ldy #>s_rev
+	jsr puts
+	pla
+rl_nr	asl
 	tax
 	lda romnames,x
 	ldy romnames+1,x
@@ -621,26 +624,27 @@ tab_bas	.byte 5
 romnames .word n_ab, n_antsc, n_bntsc, n_apal, n_r10, n_r11, n_r1, n_r2
 	.word n_r3, n_r3a, n_r3b, n_r4, n_r5, n_r59, n_r59a
 	.word n_basa, n_basb, n_basc, n_basar, n_bascar
-n_ab	dta d'REV A/B, ANY',$FF
-n_antsc	dta d'REV A NTSC',$FF
-n_bntsc	dta d'REV B NTSC',$FF
-n_apal	dta d'REV A PAL',$FF
-n_r10	dta d'REV 10 1200XL',$FF
-n_r11	dta d'REV 11 1200XL',$FF
-n_r1	dta d'REV 1',$FF
-n_r2	dta d'REV 2',$FF
-n_r3	dta d'REV 3',$FF
-n_r3a	dta d'REV 3A',$FF
-n_r3b	dta d'REV 3B',$FF
-n_r4	dta d'REV 4',$FF
-n_r5	dta d'REV 5',$FF
-n_r59	dta d'REV 59 (3B?)',$FF
-n_r59a	dta d'REV 59A',$FF
+n_ab	dta d'A/B, ANY',$FF
+n_antsc	dta d'A NTSC',$FF
+n_bntsc	dta d'B NTSC',$FF
+n_apal	dta d'A PAL',$FF
+n_r10	dta d'10 1200XL',$FF
+n_r11	dta d'11 1200XL',$FF
+n_r1	dta d'1',$FF
+n_r2	dta d'2',$FF
+n_r3	dta d'3',$FF
+n_r3a	dta d'3A',$FF
+n_r3b	dta d'3B',$FF
+n_r4	dta d'4',$FF
+n_r5	dta d'5',$FF
+n_r59	dta d'59 (3B?)',$FF
+n_r59a	dta d'59A',$FF
 n_basa	dta d'BASIC REV A',$FF
 n_basb	dta d'BASIC REV B',$FF
 n_basc	dta d'BASIC REV C',$FF
 n_basar	dta d'BASIC ARABIC',$FF
 n_bascar dta d'A, .CAR MISLOAD',$FF
+s_rev	dta d'REV ',$FF
 s_unk	dta d'UNKNOWN'*,$FF
 s_unkb	dta d'NOT IN THE TABLE',$FF
 s_none	dta d'NONE',$FF
@@ -651,5 +655,3 @@ s_rc0	dta d'OS $C000',$FF
 s_rxl	dta d'OS XL/XE',$FF
 s_rbas	dta d'BASIC',$FF
 s_rcart	dta d'CARTRIDGE',$FF
-s_rread	dta d'READING THE ROMS, A FEW SECONDS...',$FF
-s_rnote	dta d'NAMED FROM PUBLISHED CRC32 TABLES',$FF

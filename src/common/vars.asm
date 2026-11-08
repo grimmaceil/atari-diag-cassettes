@@ -75,6 +75,7 @@ PBSAVE	= BSS+$DC	; PORTB as the OS left it (xlram.asm)
 OSRAM	= BSS+$DD	; 0 = not an XL/XE, 1 = no RAM under the OS, 2 = tested
 XERAM	= BSS+$DE	; nonzero: 130XE extended banks found
 XEBANK	= BSS+$DF	; extended bank being tested (0-3)
+RAMK	= BSS+$F9	; all the RAM found, in K (boot.asm: for the machine line)
 
 ; Per-bank results, 16 entries each, indexed by:
 ;   1-4  main RAM banks (16K each; 4 = under the XL/XE OS)

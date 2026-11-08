@@ -17,6 +17,9 @@
 ;   FAULT_BANK=0..4, FAULT_BIT=1..8   inject a stuck bit; bank 0 = low RAM
 ;   FAST=1                            skip the $55/$AA march pass
 ;   ONELOAD=1                         the 48k+ tape, one boot file (below)
+;   ONE16=1                           the 16k tape, one boot file: stage 2
+;                                     is in the image (PAYAT), no loader;
+;                                     it page-tests this stage's RAM
 ;
 ; ONELOAD: the whole tape is this one boot file, loaded at $4000: this
 ; stage, then a payload built to run at $0800 (stage 2 and the system
@@ -55,6 +58,9 @@ LOAD	= $0800
 	jsr vcheck		; confirmed or not, the text stays on from here:
 	jsr ramscreen		; the display checks passed, so it can't hurt
 rt_go	jsr ramtest
+	.ifdef ONE16
+	jmp PAYAT+6		; no results here: stage 2's summary has them all
+	.endif
 	lda DISPOK
 	beq rt_res
 	jsr results
@@ -62,6 +68,10 @@ rt_go	jsr ramtest
 rt_res	lda #<golow		; a press (or a pass) goes on to the payload
 	sta CONTVEC
 	lda #>golow
+	.elseif .def ONE16
+rt_res	lda #<[PAYAT+6]		; a press (or a pass) goes on to stage 2, in
+	sta CONTVEC		; this image (the image checksum covered it)
+	lda #>[PAYAT+6]
 	.else
 rt_res	lda #<load2		; a press (or a pass) goes on to stage 2
 	sta CONTVEC
@@ -124,8 +134,27 @@ gl_msg	sta L2MSG
 	beq gl_f
 	jsr results
 gl_f	jmp final
-	.else
+	.elseif .not .def ONE16
 	icl '../common/loader.asm'
+	.endif
+
+	.ifdef ONE16
+; again: the whole RAM test once more, from the low RAM test on (stage 2's
+; START at the end). The image is intact (the page test put every page
+; back), so no reload and no image checksum: fresh results, then as at boot.
+again	sei
+	lda #0
+	sta NMIEN
+	sta DMACTL
+	tax
+ag_cl	sta BSS,x
+	inx
+	bne ag_cl
+	lda #$08
+	sta SPKPH
+	lda #C_GREEN
+	sta COLBK
+	jmp lowram
 	.endif
 ; clrrow: blank row A.
 clrrow	ldx #0
@@ -157,7 +186,6 @@ vcheck	jsr scr_on
 	jsr header
 	PRINT 2, 0, s_v1
 	PRINT 3, 0, s_v2
-	PRINT 4, 0, s_v3
 	PRINT 8, 1, s_set1
 	PRINT 9, 1, s_set2
 	lda #$80
@@ -554,8 +582,7 @@ s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF	; header prefix (header inverts it)
 s_hvid	dta d'VIDEO CHECK',$FF
 s_hram	dta d'RAM TEST',$FF
 s_v1	dta d'CAN YOU READ THIS AND SEE 8 COLOR BARS?',$FF
-s_v2	dta d'IF SO, PRESS A KEY, START, SELECT,',$FF
-s_v3	dta d'OPTION OR FIRE.',$FF
+s_v2	dta d'IF SO, PRESS ANY KEY (OR FIRE).',$FF
 s_secs	dta d'SECONDS LEFT: ',$FF
 s_last	dta d'LAST CHANCE'*,d' - SECONDS LEFT: ',$FF
 s_set1	dta d'ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789',$FF
@@ -578,7 +605,7 @@ s_result dta d'RESULT: ',$FF
 s_vnot	dta d'VIDEO NOT CONFIRMED',$FF
 s_toggle dta d'START=GO ON SELECT=RE-BEEP OPTION=FLASH',$FF
 s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
-s_l2load dta d'LOADING STAGE 2, KEEP TAPE PLAYING',$FF
+s_l2load dta d'LOADING STAGE 2...',$FF
 s_l2pre	dta d'STAGE 2: ',$FF
 s_l2_8k	dta d'NEEDS 16K. NEXT: 400 TAPE 02',$FF
 	.ifdef ONELOAD
@@ -587,12 +614,12 @@ s_l2_img dta d'LOAD BAD: USE THE 400 SET',$FF
 	.else
 s_l2_bad dta d'NOT LOADED, BANK 1 FAILED',$FF
 	.endif
-s_l2_big dta d'TOO BIG FOR THE GOOD RAM',$FF
+s_l2_big dta d'TOO BIG',$FF
 s_l2_sio dta d'ERROR $',$FF
 s_l2_hdr dta d'NOT ON TAPE',$FF
 s_l2_sum dta d'BAD CHECKSUM',$FF
 s_allpass dta d'ALL RAM PASSED',$FF
-s_somefail dta d'FAIL - CODE REPEATS ON BORDER'*,$FF
+s_somefail dta d'FAIL: SEE THE CODE'*,$FF
 
 init_rts rts
 
@@ -614,6 +641,15 @@ NPAT	= *-pats
 PAYLOAD	ins '../../build/payload48.bin'
 PAYEND
 PAYPG	= [PAYEND-PAYLOAD+$FF]/$100
+	.endif
+
+	.ifdef ONE16
+; Stage 2, as built to run here (build.py's build_one16).
+PAYPAD	= [[*+$FF]/$100]*$100
+	.if PAYPAD-*>0
+	:[PAYPAD-*] .byte 0
+	.endif
+PAYAT	ins '../../build/payload16.bin'
 	.endif
 
 ; Pad to a whole page; the last two bytes hold the image sum (mkcas.py).

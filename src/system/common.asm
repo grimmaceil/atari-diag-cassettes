@@ -370,6 +370,13 @@ mn_lp	jsr vsync
 	bne mn_lp
 	lda KBCODE
 	and #$3F
+	.ifdef RAMAGAIN
+	cmp #$32		; 0: the RAM test again (the 32k+ tape: tape 1's
+	bne mn_n0		; code is still here, intact; it comes back here)
+	jsr waitrel
+	jmp RAMAGAIN
+mn_n0
+	.endif
 	ldx #6
 mn_dig	cmp kdigit,x
 	beq mn_d
@@ -524,7 +531,11 @@ s_notrun dta d'-',$FF
 s_mall	dta d'ALL OF THEM, IN ORDER',$FF
 s_mres	dta d'RESULTS AND THE FINAL CODE',$FF
 s_m1	dta d'START=RUN  SELECT=DOWN  OPTION=UP',$FF
+	.ifdef RAMAGAIN
+s_m2	dta d'1-7: THAT TEST   0: THE RAM TEST AGAIN',$FF
+	.else
 s_m2	dta d'OR PRESS 1-7 TO RUN THAT TEST',$FF
+	.endif
 s_toggle3 dta d'START=MENU  SELECT=RE-BEEP  OPTION=FLASH',$FF
 	.endif
 

@@ -34,13 +34,19 @@ python tools/build.py --fast       # skip the $55/$AA march pass (quicker runs)
 ```
 
 `tools/build.py` holds the list of tapes (`TAPES`) and the share path
-(`SHARE`). Three tapes need more than a plain assemble:
-- The 48k+ tape (`build_oneload`): stage 1 at $4000, plus a payload built to
-  run at $0800. It takes two rounds, because the payload's addresses depend
-  on stage 1's.
-- The 16K+ burn-in (`build_bounce`): a relocation bitmap, made by assembling
-  at $0800 and at $0C00. The build then proves it, byte for byte, against
-  the code assembled at both addresses the second copy can go to.
+(`SHARE`). Some tapes need more than a plain assemble:
+- The one-load RAM tapes, 16k (`build_one16`) and 32k+ (`build_one32`):
+  tape 1's stage 1 (ONE16) with stage 2 and, for 32k+, the system tests,
+  inserted into the same image at the addresses they were built for, all
+  sharing stage 1's BSS page. Stage 2 tests stage 1's RAM page by page
+  (`src/common/pagetest.asm`). The addresses depend on the sizes and not
+  the other way round, so a few rounds settle them.
+- The 16K+ memory test (`build_bounce`): a relocation bitmap, made by
+  assembling at $0800 and at $0C00. The build then proves it, byte for
+  byte, against the code assembled at both addresses the second copy can
+  go to.
+- `build_oneload` (the earlier 48k+ tape: stage 1 at $4000 with a payload
+  copied down to $0800) is kept but no longer in `TAPES`.
 - The two-stage tapes: `tools/mkcas.py` writes each stage as its own file on
   the tape, with an end-of-file record after each.
 
@@ -52,7 +58,7 @@ python tools/build.py --fast       # skip the $55/$AA march pass (quicker runs)
 |---|---|
 | `src/common/` | shared code: boot (alive, checksum, low RAM test, size probe), display checks, the beep and flash reporter, the text screen, the RAM tests, XL/XE RAM, the stage loader |
 | `src/tape1/` | the RAM tape: stage 1, and stage 2 (relocated test, RAM under the OS, 130XE banks) |
-| `src/tape2/` | the burn-in (one source, three builds: OWNTEST, NOXL, BOUNCE) |
+| `src/tape2/` | the memory test (one source, two builds: `diag-400-memtest` with OWNTEST and NOXL, `diag-memtest` with BOUNCE) |
 | `src/system/` | the system tests: `main.asm` builds a tape from the tests that `WANT_*` defines pick; one file per test (`t_rom`, `t_kb`, `t_con`, `t_joy`, `t_pad`, `t_pok`, `t_gtia`); `common.asm` has the test flow and the menu |
 | `tools/` | build, CAS writer, simulator, keyboard map, documentation pictures |
 | `cassettes/` | the release tapes |
@@ -80,7 +86,7 @@ runs the menu's tests one by one.
 ```
 python tools/sim.py cassettes/diag-400-03-input.cas --auto --until 90
 python tools/sim.py cassettes/diag-400-01-ram.cas --stuck 2:5:1 --until 200
-python tools/sim.py cassettes/diag-48k-xl-xe.cas --xl --auto --until 900
+python tools/sim.py cassettes/diag-32k-xl-xe.cas --xl --auto --until 900
 ```
 
 A run takes minutes: py65 is pure Python. `tools/docshots.py` runs its

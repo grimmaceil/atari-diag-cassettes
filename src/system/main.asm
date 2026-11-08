@@ -36,6 +36,9 @@ RESTART	= 1			; report.asm: the end waits for START (see final)
 	.ifdef SYSLOAD
 LOAD	= SYSLOAD		; the 48k+ one-load tape: in the payload, right
 				; after stage 2's BSS page (build.py)
+	.elseif .def SYSAT
+LOAD	= SYSAT			; the 32k+ one-load tape: in tape 1's image,
+				; after its stage 2 (build.py's build_one32)
 	.elseif .def CHAIN
 LOAD	= $4000
 	.else
@@ -189,6 +192,8 @@ NPAT	= *-pats
 ; joysticks and paddles only, for alongside the SALT disks, no harness).
 	.if SETNO=2
 s_hpre	dta d' A8 DIAG 48K+ XL/XE ',$FF
+	.elseif SETNO=4
+s_hpre	dta d' A8 DIAG 32K+ XL/XE ',$FF
 	.elseif SETNO=3
 s_hpre	dta d' A8 DIAG  CONTROLS  ',$FF
 	.else
@@ -209,7 +214,11 @@ PADTO	= [[*+2+$FF]/$100]*$100
 CKSUM	.word 0			; (as stage 3: the loader's plain sum)
 IMGEND
 NREC	= [IMGEND-LOAD]/128
+	.ifdef SHAREBSS
+BSS	= SHAREBSS		; one image: tape 1's BSS page is this one's
+	.else
 BSS	= IMGEND
+	.endif
 TSTART	= [>BSS]+1
 	.ifdef SYSLOAD
 	.if [>BSS]+1>$3F		; stage 1's BSS page is $3F00 (the one-load

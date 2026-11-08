@@ -17,6 +17,12 @@
 ; area there, and the system tests are already in RAM right after this
 ; stage's BSS page, so no loader: the code plays, then on to them.
 ;
+; ONE16 (the 16k tape): not loaded but part of stage 1's image, at S2AT,
+; sharing stage 1's BSS page. The relocate test can't march the area it
+; runs in, so each page of it is saved in the screen block (tested), given
+; March C- and an address-in-page test, and put back, by a copy of the page
+; test running from low RAM (common/pagetest.asm). No display: the NOT test.
+;
 ; CHAIN3 (the 48k tape): then stage 3, the system tests, loads at $4000 if
 ; the RAM it needs passed (banks 1 and 2: the loader checks). All passed:
 ; it goes on by itself after the jingle. A fault elsewhere: its code plays,
@@ -28,12 +34,24 @@
 	icl '../common/faults.asm'
 
 LDRFOLD	= 1			; report.asm: fold the loader area into bank 1
+	.ifdef ONE16
+RESTART	= 1			; report.asm: the end waits for START: again
+ENDING	= BSS+$F7		; nonzero: the end (START runs it all again)
+	.endif
 SROW	= BSS+$DB		; summary: row of the item being printed
 	.ifdef ONELOAD
 FONT	= $B800			; ROM font copy while the OS is out (bank 3:
 				; $0800-$3FFF holds the payload)
 S2LOAD	= $0800
 S1LOADPG = $3F			; stage 1's area: its BSS page, then the image
+	.elseif .def ONE32
+FONT	= $7800			; ROM font copy while the OS is out (above the
+S2LOAD	= S2AT			; image, the screen and the BSS page)
+S1LOADPG = $08
+	.elseif .def ONE16
+FONT	= $3800			; ROM font copy while the OS is switched out
+S2LOAD	= S2AT
+S1LOADPG = $08
 	.else
 FONT	= $3800			; ROM font copy while the OS is switched out
 S2LOAD	= $2000
@@ -91,6 +109,67 @@ tk_lp	lda S1BSS,x
 
 ; Relocate test: the area stage 1 ran from. Errors are charged to the loader
 ; area's own entry, so the summary can tell it apart from the rest of bank 1.
+	.ifdef ONE16
+rl_go	ldx #0			; the page and NOT tests into low RAM
+rl_cp	lda pgsrc,x
+	sta PGCODE,x
+	inx
+	cpx #PICLEN
+	bne rl_cp
+	lda #0
+	sta NTPTR
+	sta BUFP
+	lda SCRPG
+	sta BUFP+1
+	lda #S1LOADPG
+	sta NTPTR+1
+	lda DISPOK		; no display: no tested save page
+	bne rl_pg
+	sta NTERR
+	ldx #S1TSTART-S1LOADPG
+	jsr NTCODE
+	lda NTERR
+	beq rl_xl
+	ldx #S1LOADPG		; (the first page, as the hint)
+	jsr rlbad
+	jmp rl_xl
+rl_pg	lda #0			; page by page, to name the first bad one
+	sta NTERR
+	jsr PGCODE
+	lda NTERR
+	beq rl_ok
+	ldx NTPTR+1
+	jsr rlbad
+rl_ok	inc NTPTR+1
+	lda NTPTR+1
+	cmp #S1TSTART
+	bne rl_pg
+	lda DISPOK		; the screen: it was the save page
+	beq rl_xl
+	jsr scr_on
+	lda #<s_hrel
+	ldy #>s_hrel
+	jsr header
+	jmp rl_xl
+; rlbad: page X failed with the bits in NTERR: the loader area's entry.
+rlbad	lda NTERR
+	ora BADMASK+LDRIDX
+	sta BADMASK+LDRIDX
+	lda ECNTLO+LDRIDX	; the first one: its page, as the detail
+	ora ECNTHI+LDRIDX
+	bne rb_n
+	stx EADRHI+LDRIDX
+	lda #0
+	sta EADRLO+LDRIDX
+	sta EWROTE+LDRIDX
+	lda NTERR
+	sta EREAD+LDRIDX
+rb_n	inc ECNTLO+LDRIDX	; (pages, not bytes)
+	bne rb_x
+	inc ECNTHI+LDRIDX
+rb_x	rts
+rl_xl
+	.else
 rl_go	lda #LDRIDX
 	sta CURBANK
 	sta BANKOVR
@@ -110,6 +189,7 @@ rl_go	lda #LDRIDX
 	dec INAIA
 	lda #0
 	sta BANKOVR
+	.endif
 
 	lda MACHINE
 	beq no_os
@@ -118,7 +198,23 @@ rl_go	lda #LDRIDX
 no_os	lda DISPOK
 	beq fin
 	jsr summary
-fin	ldx #LDRIDX
+fin
+	.ifdef ONE32
+	lda #<[SYS32+6]		; START: the system tests, in this image (they
+	sta CONTVEC		; take the RAM results over as test 8)
+	lda #>[SYS32+6]
+	sta CONTVEC+1
+	lda #1			; the summary stays up till then
+	sta ENDING
+	.elseif .def ONE16
+	lda #<S1AGAIN		; START: the whole test again (stage 1's again)
+	sta CONTVEC
+	lda #>S1AGAIN
+	sta CONTVEC+1
+	lda #1
+	sta ENDING
+	.endif
+	ldx #LDRIDX
 fin_lp	lda BADMASK,x
 	bne fin_bad
 	dex
@@ -423,6 +519,9 @@ puts_st	pha
 	icl '../common/bits.asm'
 	icl '../common/detail.asm'
 	icl '../common/xlram.asm'
+	.ifdef ONE16
+	icl '../common/pagetest.asm'
+	.endif
 
 s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF
 	.ifdef ONELOAD
@@ -477,7 +576,13 @@ s_l2_sum dta d'BAD CHECKSUM',$FF
 s_nextok dta d'ALL PASSED. NEXT: TAPE 02 OF THE SET',$FF
 s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
 	.endif
+	.ifdef ONE32
+s_toggle2 dta d'START=SYSTEM TESTS  SELECT=RE-BEEP',$FF
+	.elseif .def ONE16
+s_toggle2 dta d'START=AGAIN SELECT=RE-BEEP OPTION=FLASH',$FF
+	.else
 s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
+	.endif
 
 PADTO	= [[*+2+$FF]/$100]*$100
 	.if PADTO-*-2>0
@@ -486,7 +591,11 @@ PADTO	= [[*+2+$FF]/$100]*$100
 IMGSUM	.word 0			; mkcas.py: sum of every byte before this
 IMGEND
 NREC	= [IMGEND-S2LOAD]/128
+	.ifdef ONE16
+BSS	= S1BSS			; one image: stage 1's BSS page is this one's
+	.else
 BSS	= IMGEND
+	.endif
 	.if [>BSS]+1>[>FONT]
 	.error "stage 2 too big: $3800-$3FFF must stay free (font copy, screen block)"
 	.endif

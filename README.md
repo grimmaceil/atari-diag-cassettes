@@ -2,7 +2,7 @@
 
 Diagnostic tapes for the Atari 400, 800, XL and XE computers. Load one like
 any cassette program and it tests the machine: RAM, ROMs, keyboard, console
-keys, joysticks, paddles, sound and video, plus a burn-in for faults that
+keys, joysticks, paddles, sound and video, plus a memory test (burn-in) for faults that
 come and go.
 
 It reports by **border colour and beeps** first, so it works even when the
@@ -17,14 +17,14 @@ checked.
 
    | Your machine | Tapes (in `cassettes/`) |
    |---|---|
-   | 400 with 8K | `diag-400-01-ram` to `diag-400-05-av`, then `diag-400-burnin` |
-   | 400/800 with 16K-32K | `diag-16k-01-ram`, `diag-16k-02-system`, `diag-burnin` |
-   | 800 with 48K, XL, XE | `diag-48k-xl-xe` (one tape), `diag-burnin` |
+   | 400 with 8K | `diag-400-01-ram` to `diag-400-05-av`, then `diag-400-memtest` |
+   | 400/800 with 16K | `diag-16k-01-ram`, `diag-16k-02-system`, `diag-memtest` |
+   | 800 with 32K-48K, XL, XE | `diag-32k-xl-xe` (one tape), `diag-memtest` |
    | anything that won't get through its own set | the 400 set |
    | keyboard, joysticks, paddles only (16K+) | `diag-controls`: no test harness needed; goes with Atari's SALT disks |
 
-2. Load the first tape: hold START (START and OPTION on an XL/XE), switch
-   the machine on, start the tape and press a key when it beeps. You can
+2. Take out any cartridge, then load the first tape: hold START, switch the
+   machine on, start the tape and press a key when it beeps. You can
    use a MiSTer, a PC with a USB-SIO cable and AspeQt, or a real cassette.
 3. Watch and listen: green is good, red plus beeps is a fault. Long beeps
    say where (RAM bank or test number), short beeps say what (data bit or

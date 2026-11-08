@@ -27,9 +27,9 @@ differ a little.
 
 | Your machine | Use these tapes, in this order |
 |---|---|
-| 400 with 8K | `diag-400-01-ram`, `-02-rom`, `-03-input`, `-04-ports`, `-05-av`, and for a long test `diag-400-burnin` |
-| 400 or 800 with 16K or 32K | `diag-16k-01-ram`, `diag-16k-02-system`, and `diag-burnin` |
-| 800 with 48K, any XL or XE | `diag-48k-xl-xe` (one tape does it all), and `diag-burnin` |
+| 400 with 8K | `diag-400-01-ram`, `-02-rom`, `-03-input`, `-04-ports`, `-05-av`, and for a long test `diag-400-memtest` |
+| 400 or 800 with 16K | `diag-16k-01-ram`, `diag-16k-02-system`, and `diag-memtest` |
+| 800 with 32K or 48K, any XL or XE | `diag-32k-xl-xe` (one tape does it all), and `diag-memtest` |
 | **any machine that won't get through its own set** | **the 400 set**: it only needs the first 8K of RAM to work |
 | keyboard, joysticks and paddles only (16K and up) | `diag-controls`: just those three tests, no harness needed. A companion to Atari's SALT diagnostic disks, whose controller tests need a test harness |
 
@@ -40,8 +40,9 @@ Each set is ordered so that every tape relies only on what the earlier ones
 proved. For example, RAM is tested before anything else runs from it, and
 the keyboard is tested before a test asks you a yes/no question.
 
-The `-part2` files are the second half of a two-part tape on its own. You
-only need them with a player that doesn't stop between the parts (see
+`diag-400-01-ram-part2` is the second half of the 400 RAM tape on its own.
+A 400 with 8K never loads it; a bigger machine running the 400 set does. You
+only need the file with a player that doesn't stop between the parts (see
 [AspeQt](#from-a-pc-usb-sio-interface-and-aspeqt)).
 
 ## Loading a tape
@@ -49,13 +50,15 @@ only need them with a player that doesn't stop between the parts (see
 ### Starting the machine for a cassette boot
 
 1. Turn the Atari off.
-2. Hold **START**. On an XL or XE, hold **START and OPTION** (OPTION keeps
-   BASIC out of the way).
+2. Hold **START**. **Take out any cartridge** (BASIC included) for a full
+   RAM test: a cartridge covers 8K of RAM, and the machine line then says
+   `CART IN`. An XL or XE's built-in BASIC doesn't matter: the tapes switch
+   it off themselves.
 3. Turn the Atari on, still holding the keys. It beeps once.
 4. Start the tape, then press any key on the Atari.
 
 Loading takes from about one minute (the small 400 tapes) to six minutes
-(the 48k+ tape). When it's loaded, the border turns green and you hear a
+(the 32k+ tape). When it's loaded, the border turns green and you hear a
 rising chirp: the machine is running the test.
 
 ### On a MiSTer (Atari800 core)
@@ -90,13 +93,12 @@ To play a tape:
 3. Press a key on the Atari and confirm AspeQt's dialog at about the same
    time. The tape plays.
 
-AspeQt can't rewind or pause a tape. For the **two-part tapes**
-(`diag-400-01-ram` and `diag-16k-01-ram` on machines with 16K or more),
-the first part runs its RAM test for a few minutes before it asks for part
+AspeQt can't rewind or pause a tape. For the **two-part tape**
+(`diag-400-01-ram` on a machine with 16K or more), the first part runs its RAM test for a few minutes before it asks for part
 two, and by then AspeQt has played past it. The screen then says
 `STAGE 2: NOT ON TAPE` or `ERROR`. When that happens, play the matching
-`-part2.cas` file and press START on the Atari: it tries again. The
-`diag-48k-xl-xe` tape is a single part and doesn't have this problem.
+`-part2.cas` file and press START on the Atari: it tries again. Every
+other tape is a single part and doesn't have this problem.
 
 ### From a real cassette recorder
 
@@ -115,7 +117,7 @@ unreadable or the screen is switched off:
 |---|---|---|---|
 | ![](img/color-green.png) | green | `#009B58` | alive (just after loading); everything passed |
 | ![](img/color-green-flash.png) | bright green flash | `#4CE5AB` | a pass beep: the jingle, then one long flash per RAM bank or test that passed |
-| ![](img/color-yellow.png) | yellow | `#F0C55A` | testing. If it stays yellow and silent, the machine hung in that test. Burn-in: an intermittent fault has been seen |
+| ![](img/color-yellow.png) | yellow | `#F0C55A` | testing. If it stays yellow and silent, the machine hung in that test. Memory test: an intermittent fault has been seen |
 | ![](img/color-red.png) | red | `#891104` | a fault; the beep code follows |
 | ![](img/color-red-flash.png) | bright red flash | `#D15D57` | a fault beep (see the beep code below) |
 | ![](img/color-purple.png) | purple | `#AD3C9F` | waiting for you: a question to answer, or the video check's last chance |
@@ -155,15 +157,15 @@ means the tape didn't load correctly into RAM (a bad image checksum): see
 | OPTION | switch between the text screen and full-screen flashes (the whole screen flashes with the code: easier to see when the picture is garbled) |
 
 A test that passes moves on by itself after about 2 seconds. At the end of a
-tape (except the RAM tape and the burn-ins) the results stay up: START runs
+tape (except the 400 RAM tape and the memory tests) the results stay up: START runs
 that tape's tests again from the first one, or goes back to the menu on the
-16K and 48K tapes. After the
+16K and 32K tapes. The 16K RAM tape's START runs the whole RAM test again. After the
 opening screen check, no question has a time limit: every question waits
 until you answer it, with a purple border.
 
 ## The tapes, screen by screen
 
-### RAM test (`-01-ram`, and the start of `diag-48k-xl-xe`)
+### RAM test (`-01-ram`, and the start of `diag-32k-xl-xe`)
 
 **Video check.** First the tape checks that the screen works.
 
@@ -175,8 +177,8 @@ until you answer it, with a purple border.
    a moment and a 10 s last chance starts. Without an answer the test goes
    on anyway, and the results say "video not confirmed".
 3. The whole character set, normal and inverse.
-4. The machine type, the RAM found, PAL or NTSC, and a checksum of the
-   character ROM.
+4. The machine type, all the RAM found (64K on an XL/XE, 128K on a 130XE),
+   PAL or NTSC, and a checksum of the character ROM.
 5. The eight colour bars.
 
 **Testing.** Each 16K bank is tested in turn; the screen says which. On a
@@ -328,7 +330,7 @@ that move down the letters. Answer whether it looks right.
 3. Sixteen different colours.
 4. The question: do they look right?
 
-### The menu (`diag-16k-02-system` and `diag-48k-xl-xe`)
+### The menu (`diag-16k-02-system` and `diag-32k-xl-xe`)
 
 On machines with 16K or more, all seven tests are on one tape with a menu.
 
@@ -350,57 +352,57 @@ Running a test again replaces its old result.
 1. Every test: PASS, FAIL and its items, or `-` if not run.
 2. The ROMs (see [ROMs](#roms-diag-400-02-rom-test-1-in-the-system-tapes)).
 
-### The 48K and XL/XE tape (`diag-48k-xl-xe`)
+### The 32K and XL/XE tape (`diag-32k-xl-xe`)
 
-One tape, one load. It tests the RAM in two steps (first everywhere except
-where it loaded, then, from the RAM it has just proven, the area it loaded
-into), then the RAM under the OS and the 130XE banks, then the seven tests
-with the menu.
-
-![Testing the RAM the tape loaded into](img/48k-01-image-area.png)
+One tape, one load, for an 800 with 32K or 48K and every XL and XE:
+1. The RAM test: everything above the program gets the full test.
+2. The program's own RAM, page by page: each page is moved into the screen
+   (the top rows show a jumble for a moment), tested, and put back.
+3. On an XL/XE: the RAM under the OS and, on a 130XE, the four extra banks.
+4. The seven tests, with the menu.
 
 At the end, RAM faults show up again as test 8, with the bank as the item:
 
-![48K results](img/48k-02-results.png)
+![Results](img/48k-02-results.png)
 
 1. The seven tests.
 2. Test 8: the RAM. FAIL with the bank numbers if any RAM failed; the code
    plays them as long ×8, then short × bank.
 3. The ROMs: here a real XL OS rev 2 and BASIC rev A.
 
-### Burn-in (`diag-burnin`, `diag-400-burnin`)
+### Memory test (`diag-memtest`, `diag-400-memtest`)
 
-The burn-in repeats the RAM tests until you press a key: leave it running
+The memory test (a burn-in) repeats the RAM tests until you press a key: leave it running
 for an hour or a day to catch faults that only show when the machine is
 warm. It keeps a clock, counts passes, and logs every bad bit: in which
 pass it first failed, and in how many passes since. A bit that failed every
 time is **solid**; one that only fails sometimes is **intermittent**.
 
-![Burn-in running](img/burnin-01-running.png)
+![Memory test running](img/burnin-01-running.png)
 
 1. The pass number and how long it has run.
 2. What it's testing now.
-3. The log: bank (B1-B8; B9 is the burn-in's own RAM on the 400 version),
+3. The log: bank (B1-B8; B9 is the memory test's own RAM on the 400 version),
    bit, the first pass it failed in, and failed/passes.
 4. Press a key to stop after the pass in progress.
 
 The border shows the state so far: green no errors, red solid errors only,
 yellow if anything intermittent has been seen.
 
-![Burn-in summary](img/burnin-02-summary.png)
+![Memory test summary](img/burnin-02-summary.png)
 
 1. Passes, time and the result.
 2. The log.
 
-The burn-in also tests the RAM it runs in:
-- **`diag-400-burnin`:** each page of its own code is moved aside, tested
+The memory test also tests the RAM it runs in:
+- **`diag-400-memtest`:** each page of its own code is moved aside, tested
   and put back, every pass. While that happens the top of the screen shows
   the page being worked on, as a jumble of characters.
-- **`diag-burnin`:** on 32K and up it keeps two copies of itself that take
+- **`diag-memtest`:** on 32K and up it keeps two copies of itself that take
   turns, each testing the other's RAM. So the RAM it sits in gets the same
   full test as all the rest.
 
-Every pass, both burn-ins also test the screen's own RAM where you can see
+Every pass, both memory tests also test the screen's own RAM where you can see
 it: an inverse bar runs down the screen, one row at a time. Each row is
 inverted, held for two frames, checked, put back and checked again.
 
@@ -418,7 +420,7 @@ inverted, held for two frames, checked, put back and checked again.
   each 16K board has its own chips, so the bank tells you which board. The
   same bad bit in every bank points at something shared: a data line, a
   socket, or a buffer chip.
-- **Run the burn-in** on a machine that passes but misbehaves, or after a
+- **Run the memory test** on a machine that passes but misbehaves, or after a
   repair. Intermittent faults often only show when the machine is warm.
 - **Fall back to the 400 set** when a machine can't get through its own
   tapes. It only needs the first 8K of RAM. In particular:
@@ -437,8 +439,8 @@ So that a tape never needs more RAM than the machine has, and bigger
 machines load in fewer steps. The 400 set works on everything, which is why
 it's the fallback.
 
-### Is this a substitute for a burn-in?
+### Is this a substitute for the memory test?
 
 No. The RAM tapes test every byte with strong patterns, but only once. A
-fault that only shows when warm, or now and then, needs the burn-in running
+fault that only shows when warm, or now and then, needs the memory test running
 for a while.

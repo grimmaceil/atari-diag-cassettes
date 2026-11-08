@@ -166,6 +166,11 @@ lr_boot
 lr_pass	ldx #$FF
 	txs
 	inc STACKOK
+	lda PORTB		; XL/XE: built-in BASIC out (PORTB bit 1), so the
+	ora #$02		; RAM under it is found and tested. (400/800: the
+	sta PORTB		; PIA port is input, the write does nothing.) A
+				; plugged-in cartridge can't be switched out:
+				; machinfo says CART IN ($BFFC = 0)
 
 ; RAM size. One probe per 4K block from $2000 (the stage itself loaded below
 ; $2000, and every machine has 8K). A block counts as RAM if $A5 and $5A
@@ -208,3 +213,57 @@ pr_lp	lda RAMTOP
 	sta RAMTOP
 	bne pr_lp
 pr_done
+
+; The RAM beyond the 48K map, for the machine line: an XL/XE's RAM under the
+; OS (switched out, PORTB bit 0 = 0) and a 130XE's extended banks (PORTB bit
+; 4 = 0: bank 0 at $4000, unless it just aliases main RAM). Interrupts are
+; off and every byte is put back. On a 400/800 the PORTB writes do nothing
+; and $C000 isn't RAM, so both probes fail. RAMK = the total, in K.
+	lda RAMTOP
+	lsr
+	lsr
+	sta RAMK
+	.ifndef NORAMK		; (the 8K memory test: main RAM is all there is)
+	lda PORTB
+	pha
+	and #$FE		; OS out
+	sta PORTB
+	ldx $C000		; RAM under the OS: does an inverted byte stick?
+	txa
+	eor #$FF
+	sta $C000
+	cmp $C000
+	stx $C000
+	bne rk_x
+	lda RAMK		; 64K
+	adc #15			; (C is set: the CMP matched)
+	sta RAMK
+	pla			; extended bank 0 in
+	pha
+	and #$E2
+	sta PORTB
+	ldx $4000
+	txa
+	eor #$FF
+	sta $4000		; if that went to main RAM, it shows there
+	pla
+	pha
+	sta PORTB
+	txa
+	eor #$FF
+	eor $4000		; Z: main RAM changed, no extended RAM
+	bne rk_xe
+	stx $4000
+	beq rk_x
+rk_xe	pla			; extended RAM: put its byte back
+	pha
+	and #$E2
+	sta PORTB
+	stx $4000
+	lda RAMK		; 128K
+	clc
+	adc #64
+	sta RAMK
+rk_x	pla
+	sta PORTB
+	.endif
