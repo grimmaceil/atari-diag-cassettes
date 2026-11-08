@@ -154,7 +154,10 @@ means the tape didn't load correctly into RAM (a bad image checksum): see
 | SELECT | play the beep code again |
 | OPTION | switch between the text screen and full-screen flashes (the whole screen flashes with the code: easier to see when the picture is garbled) |
 
-A test that passes moves on by itself after about 2 seconds. After the
+A test that passes moves on by itself after about 2 seconds. At the end of a
+tape (except the RAM tape and the burn-ins) the results stay up: START runs
+that tape's tests again from the first one, or goes back to the menu on the
+16K and 48K tapes. After the
 opening screen check, no question has a time limit: every question waits
 until you answer it, with a purple border.
 

@@ -46,11 +46,5 @@
   "atari": "$0C",
   "rgb": "#CBC3D0",
   "meaning": "the text (luminance 12)"
- },
- {
-  "name": "done key",
-  "atari": "$C6",
-  "rgb": "#008039",
-  "meaning": "keyboard map: a key already pressed"
  }
 ]

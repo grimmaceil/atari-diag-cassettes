@@ -30,6 +30,7 @@
 	icl '../common/faults.asm'
 
 QUICKSCR = 1			; display.asm: quick screen-block test
+RESTART	= 1			; report.asm: the end waits for START (see final)
 
 	opt h-
 	.ifdef SYSLOAD

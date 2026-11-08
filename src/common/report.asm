@@ -182,6 +182,10 @@ pass	BEEP T_J1
 	NCALL RET1, hold
 	lda CONTVEC+1
 	beq pa_top
+	.ifdef RESTART
+	lda ENDING		; the system tapes' end: START goes on (again),
+	bne pa_top		; nothing goes on by itself
+	.endif
 	jmp (CONTVEC)
 pa_top	lda NBANKS
 	sta RCNT

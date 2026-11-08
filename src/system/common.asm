@@ -11,6 +11,7 @@ TEST	= BSS+$E0		; current test, 1-7
 NEXTVEC	= BSS+$E1		; 2: where the test flow goes on to
 STASH	= BSS+$E3		; 8: BADMASK 1-8 while one test's code plays
 TIDX	= BSS+$ED		; next tlist entry, times 2
+ENDING	= BSS+$F7		; nonzero: the tape's results; START runs it again
 T3D	= BSS+$70		; 96 bytes of test data:
 NPORT	= T3D+$02		; joystick ports on this machine (paddles: twice)
 				; $03-$1F: test 1's results (kept for the summary)
@@ -39,6 +40,18 @@ tst_nt	stx MNT
 	jmp menu
 tst_all	inc MMODE
 	.endif
+	jsr tnextv
+	jmp (NEXTVEC)
+
+; trestart: the tape's tests again from the first, with fresh results (not
+; test 8, the 48k tape's RAM).
+trestart lda #0
+	sta ENDING
+	sta TIDX
+	ldx #7
+trs_cl	sta BADMASK,x
+	dex
+	bne trs_cl
 	jsr tnextv
 	jmp (NEXTVEC)
 
@@ -298,13 +311,17 @@ redraw	= tshow			; scrtoggle's text screen
 final	lda #8			; tshow, as redraw, shows the results from here
 	sta TEST
 	.ifdef MENU
-	lda #<menu		; then back to the menu
+	lda #<menu		; START: back to the menu
 	sta CONTVEC
 	lda #>menu
 	.else
-	lda #0
+	lda #<trestart		; START: the tape's tests again
+	sta CONTVEC
+	lda #>trestart
 	.endif
 	sta CONTVEC+1
+	lda #1			; and the result stays up till then
+	sta ENDING
 	ldx #0
 fi_cnt	lda ttests,x
 	beq fi_n
@@ -391,6 +408,8 @@ mn_set	stx MSEL
 
 ; mgo: run the highlighted line: a test, all of them, or the results.
 mgo	jsr waitrel
+	lda #0			; (a pass goes on by itself again)
+	sta ENDING
 	lda MSEL
 	cmp MNT
 	bcc mr_t
@@ -603,7 +622,7 @@ rz_rd	inc CNT
 	.ifdef MENU
 	PRINT 23, 0, s_toggle3	; START: back to the menu
 	.else
-	PRINT 23, 0, s_toggle2
+	PRINT 23, 0, s_toggle4	; START: the tests again
 	.endif
 	rts
 
@@ -645,7 +664,7 @@ s_fail	dta d'FAIL'*,$FF
 s_items	dta d', ITEMS',$FF
 s_tpass	dta d'NEXT TEST IN 2 S.  OPTION = FLASH      ',$FF
 s_toggle dta d'START=GO ON SELECT=RE-BEEP OPTION=FLASH',$FF
-s_toggle2 dta d'SELECT=RE-BEEP  OPTION=FULL-SCREEN FLASH',$FF
+s_toggle4 dta d'START=AGAIN SELECT=RE-BEEP OPTION=FLASH',$FF
 s_items2 dta d'FAIL N: ITEM N. THE CODE IS TEST, ITEM.',$FF
 s_heard	dta d'HEARD IT? Y/START = YES, N/SELECT = NO',$FF
 s_hres	dta d'RESULTS',$FF
