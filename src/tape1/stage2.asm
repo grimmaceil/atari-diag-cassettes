@@ -155,6 +155,9 @@ rl_ok	inc NTPTR+1
 rlbad	lda NTERR
 	ora BADMASK+LDRIDX
 	sta BADMASK+LDRIDX
+	lda NTERR		; the march found them (the summary's hint)
+	ora MBAD+LDRIDX
+	sta MBAD+LDRIDX
 	lda ECNTLO+LDRIDX	; the first one: its page, as the detail
 	ora ECNTHI+LDRIDX
 	bne rb_n
