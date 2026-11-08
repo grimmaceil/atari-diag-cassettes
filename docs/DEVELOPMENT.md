@@ -28,7 +28,7 @@ The tapes were built and tested with:
 
 ```
 python tools/build.py              # every tape: build/ (all output), cassettes/ (the release tapes)
-python tools/build.py --deploy     # the same, then copies the tapes to the MiSTer share
+python tools/build.py --nodeploy   # the same, without copying the changed tapes to the MiSTer share
 python tools/build.py --fault 2,5  # extra builds with a stuck bit 5 in bank 2, to hear a fail code
 python tools/build.py --fast       # skip the $55/$AA march pass (quicker runs)
 ```

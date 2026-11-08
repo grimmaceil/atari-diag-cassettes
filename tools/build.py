@@ -7,7 +7,9 @@
                                         5-8 = 130XE, 9 = loader area)
   python tools/build.py --fault 2,5,3   ... only every 3rd burn-in pass
   python tools/build.py --fast          skip the slow test patterns
-  python tools/build.py --deploy        copy the .cas files to the MiSTer share
+  python tools/build.py --nodeploy      don't copy the tapes to the MiSTer share
+                                        (by default every build copies the
+                                        release tapes there that changed)
 """
 import argparse
 import shutil
@@ -238,7 +240,7 @@ def main():
     ap.add_argument('--fault', help='BANK,BIT[,EVERY]  (bank 0 = low RAM; EVERY: burn-in '
                     'only, inject every n-th pass)')
     ap.add_argument('--fast', action='store_true')
-    ap.add_argument('--deploy', action='store_true')
+    ap.add_argument('--nodeploy', action='store_true')
     a = ap.parse_args()
 
     BUILD.mkdir(exist_ok=True)
@@ -273,10 +275,19 @@ def main():
     for c in cas:
         if 'FAULT' not in c.name:       # fault-injection builds stay in build/
             shutil.copy2(c, CASSETTES / c.name)
-    if a.deploy:
-        for c in cas:
-            shutil.copy2(c, SHARE / c.name)
-            print('deployed', SHARE / c.name)
+    if a.nodeploy or a.fast:        # (FAST tapes skip test patterns: not for use)
+        return
+    for c in cas:                   # the release tapes to the share, for testing
+        if 'FAULT' in c.name:
+            continue
+        dst = SHARE / c.name
+        try:
+            if dst.exists() and dst.read_bytes() == c.read_bytes():
+                continue
+            shutil.copy2(c, dst)
+            print('deployed', dst)
+        except OSError as e:        # share offline, or the file in use
+            print(f'NOT deployed {c.name}: {e}')
 
 
 if __name__ == '__main__':
