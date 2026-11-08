@@ -28,9 +28,8 @@ SHARE = Path('//TRUENAS/Media/games/ATARI800/_diag')   # the tapes, in the MiSTe
 # The system tapes are one main.asm with the tests picked by WANT_* defines.
 # The 400 and 16k sets share tape 1: its stage 2 (16K and up) relocates the
 # RAM test to the RAM stage 1 sat in, and tests the XL/XE extras where it
-# finds them. The 48k+ set is one boot file (build_oneload): tape 1's stage 1
-# at $4000 (ONELOAD), with a payload built for $0800 appended: stage 2
-# (ONELOAD+CHAIN3), its BSS page, then the system tests (CHAIN, SYSLOAD).
+# finds them. The one-load 16k and 32k+ RAM tapes are built by build_one16
+# and build_one32.
 ALL7 = dict(WANT_ROM=1, WANT_KB=1, WANT_CON=1, WANT_JOY=1, WANT_PAD=1,
             WANT_POK=1, WANT_GTIA=1)
 S400 = {'SETNO': 0}
@@ -75,9 +74,8 @@ def build(src, name, stages, defines, label):
     s1 = labels(f'{out}.lab')
     prev, nexts = s1, []
     for k, asm in enumerate(stages[1:], 2):
-        # 'dir/file.asm' takes a stage from another source dir (the 48k tape's
-        # stage 3 is the system tests). PREVBSS: the stage before, whose
-        # results it takes over.
+        # 'dir/file.asm' takes a stage from another source dir. PREVBSS: the
+        # stage before, whose results it takes over.
         sdir, sasm = asm.split('/') if '/' in asm else (src, asm)
         d = dict(defines, S1BSS=f"${s1['BSS']:04X}", S1TSTART=f"${s1['TSTART']:02X}",
                  PREVBSS=f"${prev['BSS']:04X}")
@@ -89,36 +87,6 @@ def build(src, name, stages, defines, label):
                    check=True)
     return [Path(f'{out}.cas')] + [Path(f'{out}-part{k}.cas')
                                    for k in range(2, len(stages) + 1)]
-
-
-def build_oneload(name, defines, label):
-    """The 48k+ tape: one boot file. The payload's addresses depend on stage
-    1's BSS (stage 2 takes its results over) and stage 1's size on the
-    payload's, but no size depends on an address, so two rounds settle it."""
-    out = BUILD / name
-    s2, sy, pay = Path(f'{out}.s2'), Path(f'{out}.sys'), BUILD / 'payload48.bin'
-    s1d = dict(defines, ONELOAD=1)
-    s1 = {'BSS': 0x9000, 'TSTART': 0x91}         # a guess, for the first round
-    for _ in range(3):
-        d2 = dict(defines, ONELOAD=1, CHAIN3=1, S1BSS=f"${s1['BSS']:04X}",
-                  S1TSTART=f"${s1['TSTART']:02X}")
-        mads('tape1', 'stage2.asm', s2, d2)
-        bss2 = labels(f'{s2}.lab')['BSS']
-        dsy = dict(defines, CHAIN=1, SYSLOAD=f'${bss2 + 0x100:04X}', PREVBSS=f'${bss2:04X}')
-        mads('system', 'main.asm', sy, dsy)
-        img2 = Path(f'{s2}.bin').read_bytes()
-        assert 0x0800 + len(img2) == bss2
-        pay.write_bytes(img2 + bytes(0x100) + Path(f'{sy}.bin').read_bytes())
-        mads('tape1', 'main.asm', out, s1d)
-        new = labels(f'{out}.lab')
-        if new['BSS'] == s1['BSS']:
-            break
-        s1 = new
-    else:
-        sys.exit('build_oneload: stage 1 BSS did not settle')
-    subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
-                    '--boot', f'{out}.bin', f'{out}.lab', '--name', label], check=True)
-    return [Path(f'{out}.cas')]
 
 
 def build_bounce(name, defines, label):
@@ -247,9 +215,6 @@ def main():
     cas = []
     for src, name, stages, defs in TAPES:
         d = dict(defs, FAST=1) if a.fast else dict(defs)
-        if src == 'oneload':
-            cas += build_oneload(name, d, f'A8 {name.upper()}')
-            continue
         if src == 'one32':
             cas += build_one32(name, d, f'A8 {name.upper()}')
             continue

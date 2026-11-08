@@ -11,7 +11,7 @@
 ; timers, IRQ for the serial input. Low RAM, where the OS keeps its state,
 ; has passed and was restored, so that is safe now.
 ; It loads at LDTO, into RAM this stage has just tested: $2000 (bank 1) for
-; tape 1's stage 2; the 48k tape's stage 2 sets $4000 (bank 2) for stage 3.
+; tape 1's stage 2 (the 400 tape).
 	.ifndef LDTO
 LDTO	= $2000
 	.endif

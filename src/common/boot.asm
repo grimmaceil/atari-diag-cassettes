@@ -214,7 +214,7 @@ pr_lp	lda RAMTOP
 	bne pr_lp
 pr_done
 
-; The RAM beyond the 48K map, for the machine line: an XL/XE's RAM under the
+; The RAM beyond $0000-$BFFF, for the FOUND line: an XL/XE's RAM under the
 ; OS (switched out, PORTB bit 0 = 0) and a 130XE's extended banks (PORTB bit
 ; 4 = 0: bank 0 at $4000, unless it just aliases main RAM). Interrupts are
 ; off and every byte is put back. On a 400/800 the PORTB writes do nothing

@@ -20,10 +20,10 @@
 ; START, a key or fire; SELECT replays it, OPTION switches to full-screen
 ; flashes. After the last test, the tape's results and the final code.
 ;
-; CHAIN (the 48k tape): not a boot file but stage 3 of tape 1, loaded at $4000
-; by its stage 2 once the RAM it needs has passed. It takes over stage 2's
-; results; their RAM faults become test 8, item = bank, on the results
-; screen and in the final code. Built with -d:PREVBSS=... (stage 2's BSS).
+; CHAIN (the 32k+ tape): not a boot file but part of tape 1's image, at
+; SYSAT, entered by its stage 2. It takes over stage 2's results; their RAM
+; faults become test 8, item = bank, on the results screen and in the final
+; code. Built with -d:PREVBSS=... (stage 2's BSS).
 
 	icl '../common/hw.asm'
 	icl '../common/vars.asm'
@@ -33,14 +33,9 @@ QUICKSCR = 1			; display.asm: quick screen-block test
 RESTART	= 1			; report.asm: the end waits for START (see final)
 
 	opt h-
-	.ifdef SYSLOAD
-LOAD	= SYSLOAD		; the 48k+ one-load tape: in the payload, right
-				; after stage 2's BSS page (build.py)
-	.elseif .def SYSAT
+	.if .def SYSAT
 LOAD	= SYSAT			; the 32k+ one-load tape: in tape 1's image,
 				; after its stage 2 (build.py's build_one32)
-	.elseif .def CHAIN
-LOAD	= $4000
 	.else
 LOAD	= $0800
 	.endif
@@ -188,11 +183,9 @@ NPAT	= *-pats
 	icl 'common.asm'
 
 ; The header bar names the tape, as its file is named (SETNO 0 = the 400
-; set, 1 = 16K, 2 = the old 48k tape, 3 = controls, 4 = 32k+), so it can't
+; set, 1 = 16K, 3 = controls, 4 = 32k+), so it can't
 ; be taken for the machine found: that is the FOUND line below it.
-	.if SETNO=2
-s_hpre	dta d' DIAG-48K-XL-XE  ',$FF
-	.elseif SETNO=4
+	.if SETNO=4
 s_hpre	dta d' DIAG-32K-XL-XE  ',$FF
 	.elseif SETNO=3
 s_hpre	dta d' DIAG-CONTROLS  ',$FF
@@ -225,8 +218,3 @@ BSS	= SHAREBSS		; one image: tape 1's BSS page is this one's
 BSS	= IMGEND
 	.endif
 TSTART	= [>BSS]+1
-	.ifdef SYSLOAD
-	.if [>BSS]+1>$3F		; stage 1's BSS page is $3F00 (the one-load
-	.error "system tests too big for the one-load payload (BSS must end below $3F00)"
-	.endif				; screen is never at $3C00, see display.asm)
-	.endif

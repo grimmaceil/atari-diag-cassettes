@@ -12,22 +12,13 @@
 ; Then the final code: the loader area counts as bank 1 for the beeps.
 ; Built with -d:S1BSS=... -d:S1TSTART=... from stage 1's label table.
 ;
-; ONELOAD (the 48k+ tape, with CHAIN3): not loaded from tape but copied to
-; $0800 by stage 1, which ran at $4000. The relocate test covers stage 1's
-; area there, and the system tests are already in RAM right after this
-; stage's BSS page, so no loader: the code plays, then on to them.
-;
 ; ONE16 (the 16k tape): not loaded but part of stage 1's image, at S2AT,
 ; sharing stage 1's BSS page. The relocate test can't march the area it
 ; runs in, so each page of it is saved in the screen block (tested), given
 ; March C- and an address-in-page test, and put back, by a copy of the page
 ; test running from low RAM (common/pagetest.asm). No display: the NOT test.
-;
-; CHAIN3 (the 48k tape): then stage 3, the system tests, loads at $4000 if
-; the RAM it needs passed (banks 1 and 2: the loader checks). All passed:
-; it goes on by itself after the jingle. A fault elsewhere: its code plays,
-; and START goes on. Banks 1-2 bad, or under 32K: the tape ends here and
-; says which set to use instead.
+; ONE32 (the 32k+ tape, with ONE16): the same, then START goes on to the
+; system tests, which are in the image too.
 
 	icl '../common/hw.asm'
 	icl '../common/vars.asm'
@@ -39,12 +30,7 @@ RESTART	= 1			; report.asm: the end waits for START: again
 ENDING	= BSS+$F7		; nonzero: the end (START runs it all again)
 	.endif
 SROW	= BSS+$DB		; summary: row of the item being printed
-	.ifdef ONELOAD
-FONT	= $B800			; ROM font copy while the OS is out (bank 3:
-				; $0800-$3FFF holds the payload)
-S2LOAD	= $0800
-S1LOADPG = $3F			; stage 1's area: its BSS page, then the image
-	.elseif .def ONE32
+	.if .def ONE32
 FONT	= $7800			; ROM font copy while the OS is out (above the
 S2LOAD	= S2AT			; image, the screen and the BSS page)
 S1LOADPG = $08
@@ -77,19 +63,7 @@ tk_lp	lda S1BSS,x
 	sta BSS,x
 	inx
 	bne tk_lp
-	.ifdef ONELOAD
-	lda #<[BSS+$106]	; a press (or a pass) goes on to the system tests,
-	sta CONTVEC		; right after this stage's BSS page
-	lda #>[BSS+$106]
-	.elseif .def CHAIN3
-	lda #0			; stage 1's load may have needed a retry: its
-	sta L2STAT		; SIO status is not about stage 3
-	lda #<load2		; a press (or a pass) goes on to stage 3
-	sta CONTVEC
-	lda #>load2
-	.else
 	lda #0			; this stage's result is the tape's last
-	.endif
 	sta CONTVEC+1
 
 	lda #C_YELLOW
@@ -227,24 +201,6 @@ fin_bad	jmp report
 
 redraw	= summary		; scrtoggle's text screen
 
-	.ifdef CHAIN3
-	.ifndef ONELOAD
-LDTO	= $4000			; loader.asm: stage 3, in bank 2
-SKIPEOF	= 1			; loader.asm: stage 2's own EOF record comes first
-results	= summary		; loader.asm: its redraw, with the L2MSG line
-final	= fin			; and the tape's end when stage 3 can't load
-	icl '../common/loader.asm'
-	.endif
-; clrrow: blank row A.
-clrrow	ldx #0
-	jsr at
-	ldx #40
-	lda #0
-cr_lp	jsr putc
-	dex
-	bne cr_lp
-	rts
-	.endif
 
 ; Progress lines for xlram.asm.
 osprog	lda DISPOK
@@ -448,24 +404,6 @@ su_dd	lda #16
 	jsr faildetail
 	PRINT 21, 0, s_nextbad
 su_end
-	.ifdef CHAIN3
-	lda L2MSG+1		; why stage 3 didn't load
-	beq su_l2
-	lda #22
-	jsr clrrow
-	PRINT 22, 0, s_l2pre
-	lda L2MSG
-	ldy L2MSG+1
-	jsr puts
-	lda L2STAT
-	beq su_l2
-	jsr puthex
-su_l2	lda CONTVEC+1
-	beq su_t2
-	PRINT 23, 0, s_toggle
-	rts
-su_t2
-	.endif
 	PRINT 23, 0, s_toggle2
 	rts
 
@@ -530,30 +468,16 @@ puts_st	pha
 s_hpre	dta d' DIAG-32K-XL-XE  ',$FF
 	.elseif .def ONE16
 s_hpre	dta d' DIAG-16K-01-RAM  ',$FF
-	.elseif .def ONELOAD
-s_hpre	dta d' DIAG-48K-XL-XE  ',$FF
 	.else
 s_hpre	dta d' DIAG-400-01-RAM  ',$FF
 	.endif
-	.ifdef ONELOAD
-s_hrel	dta d'IMAGE AREA',$FF
-	.else
 s_hrel	dta d'LOADER AREA',$FF
-	.endif
 s_hsum	dta d'SUMMARY',$FF
-	.ifdef ONELOAD
-s_tldr	dta d'TESTING THE IMAGE AREA $3F00-$',$FF
-	.else
 s_tldr	dta d'TESTING LOADER AREA $0800-$',$FF
-	.endif
 s_i1	dta d'1 LOW RAM $0000-$07FF',$FF
 s_i2	dta d'2 DISPLAY CHECKS',$FF
 s_i3	dta d'3 VIDEO CHECK',$FF
-	.ifdef ONELOAD
-s_i7	dta d'7 IMAGE AREA $3F00-$',$FF
-	.else
 s_i7	dta d'7 LOADER AREA $0800-$',$FF
-	.endif
 s_i8	dta d'8 BANK 4 $C000-$FFFF',$FF
 s_i9	dta d'9 130XE BANKS 5-8',$FF
 s_xe	dta d' XE',$FF
@@ -571,19 +495,6 @@ s_tos	dta d'TESTING RAM UNDER THE OS ROM',$FF
 s_txe	dta d'TESTING 130XE BANKS',$FF
 s_nfail	dta d'FAILURES: ',$FF
 s_detail dta d'DETAIL:',$FF
-	.ifdef CHAIN3
-s_nextok dta d'ALL PASSED. THE LAST LINE: WHAT NEXT',$FF
-s_nextbad dta d'FIX THIS FIRST. THE LAST LINE: WHAT NEXT',$FF
-s_toggle dta d'START=GO ON SELECT=RE-BEEP OPTION=FLASH',$FF
-s_l2load dta d'LOADING THE SYSTEM TESTS, KEEP PLAYING',$FF
-s_l2pre	dta d'SYSTEM TESTS: ',$FF
-s_l2_8k	dta d'NEED 32K: USE THE 16K SET',$FF
-s_l2_bad dta d'BANK 1 BAD: USE THE 400 SET',$FF
-s_l2_big dta d'NEED BANK 2: USE 400 SET',$FF
-s_l2_sio dta d'ERROR $',$FF
-s_l2_hdr dta d'NOT ON TAPE',$FF
-s_l2_sum dta d'BAD CHECKSUM',$FF
-	.else
 	.ifdef ONE32
 s_nextok dta d'ALL PASSED. START: THE SYSTEM TESTS',$FF
 s_nextbad dta d'FIX THIS FIRST, OR START: SYSTEM TESTS',$FF
@@ -593,7 +504,6 @@ s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
 	.else
 s_nextok dta d'ALL PASSED. NEXT: DIAG-400-02-ROM',$FF
 s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
-	.endif
 	.endif
 	.ifdef ONE32
 s_toggle2 dta d'START=SYSTEM TESTS  SELECT=RE-BEEP',$FF

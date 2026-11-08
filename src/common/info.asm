@@ -1,6 +1,6 @@
 ; Machine/display info lines, shared by the text screens.
 
-; machinfo: "MACHINE 400/800  RAM 48K  NTSC" on row A.
+; machinfo: "FOUND: 400/800  RAM 16K  NTSC" on row A.
 machinfo ldx #0
 	jsr at
 	lda MACHINE

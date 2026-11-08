@@ -44,7 +44,7 @@ tst_all	inc MMODE
 	jmp (NEXTVEC)
 
 ; trestart: the tape's tests again from the first, with fresh results (not
-; test 8, the 48k tape's RAM).
+; test 8, the 32k+ tape's RAM).
 trestart lda #0
 	sta ENDING
 	sta TIDX
@@ -369,7 +369,7 @@ fi_bad	jmp report
 
 	.ifdef MENU
 ; ---------------------------------------------------------------------------
-; The test menu (16k/48k sets): every test on the tape with its state, then
+; The test menu (16k and 32k+ tapes): every test on the tape with its state, then
 ; ALL (every test in order) and the results. START runs the highlighted
 ; line, SELECT moves down, OPTION up; keys 1-7 run that test. After a test
 ; it comes back here with the next one highlighted, so START, START...
@@ -678,7 +678,7 @@ rz_n	ldx CNT
 	inx
 	bne rz_lp
 rz_end	.ifdef CHAIN
-	lda CNT			; the 48k tape: RAM from stages 1-2, as test 8
+	lda CNT			; the 32k+ tape: RAM from stages 1-2, as test 8
 	clc
 	adc #4
 	ldx #0
