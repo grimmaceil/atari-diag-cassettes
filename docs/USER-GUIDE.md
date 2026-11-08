@@ -127,6 +127,11 @@ its own. A machine with 8K never loads it (the screen says
 When the tape has loaded, the border turns green and you hear a rising
 chirp: the machine is running the test.
 
+If a load fails (BOOT ERROR, or a crash before the green chirp), load it
+again: turn the Atari off, rewind or reload the tape, and start over. A
+load that works on the second try is fine; the tape is good. Only a load
+that fails every time, at the same point, means something is wrong.
+
 ### On a MiSTer (Atari800 core)
 
 Put the `.cas` files on the MiSTer's storage (for example in
@@ -604,8 +609,9 @@ inverted, held for two frames, checked, put back and checked again.
   - a crash or a hang (the border stays yellow and silent) partway through
 - **Red border and the low tone on and off, right after loading:** not a
   fault. The tape needs more RAM than the machine has; use a smaller set.
-- **A tape that won't load at all**, or a BOOT ERROR, also points at the
-  first part of RAM, or the cassette or SIO connection.
+- **A tape that won't load at all**, or a BOOT ERROR, every time: first
+  load it again (one failed load means nothing). If it fails every time,
+  it points at the first part of RAM, or the cassette or SIO connection.
 
 ## Questions
 
