@@ -338,21 +338,23 @@ the machine can't hold, and it loads in as few steps as the RAM allows.
 | Set | For | Layout |
 |---|---|---|
 | `diag-400-*` (built) | 8K 400 | Each tape is one stage that fits 8K and leaves about 2K for the screen and working storage. The tests are split logically and run progressively: 01 RAM, 02 ROMs (test 1), 03 input (tests 2-3), 04 ports (5-6), 05 sound and video (4, 7). Later tapes rely only on what earlier ones proved: the Y/N answers come from keys already tested. |
-| `diag-16k-*` (built) | 16K-32K 400/800 | 01 RAM (tape 1: stage 2 relocates to test the RAM stage 1 sat in), 02 system: all seven tests in one 68-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; ALL runs every test). |
-| `diag-48k-xl-xe` (built) | 48K 800, XL/XE | One boot file, one load (138 records at $4000). Stage 1 is tape 1's, built with ONELOAD: it tests $0800-$3FFF and everything above the image, then copies a payload (built by build_oneload to run at $0800) into $0800-$3AFF. The payload is stage 2 (ONELOAD: it tests the image's RAM, $4000-$85FF, then the RAM under the OS and the 130XE banks; font copy at $B800) and the system tests at $1B00 with the menu; RAM faults become test 8. Bank 1 bad, or a load or image-checksum failure: use the 400 set, the fallback for every machine. |
-| `diag-400-burnin`, `diag-burnin` (built) | 8K / 16K+ | One load each. The 8K one (OWNTEST, NOXL) re-checks its own image sum every pass. It then page-tests its own RAM: each page is saved in the screen block, given March C- and an address-in-page test, restored and read back. The screen block takes a NOT test. Both tests are position-independent routines (branches and (zp),y only) copied to $0400-$04FF. The 16K+ one (BOUNCE) swaps between two relocated copies every pass, $20 pages apart on the 400/800 and at $8000 on the XL/XE, so its own RAM gets the full tests too. It falls back to the page test when copy B doesn't fit (16K). |
+| `diag-16k-*` (built) | 16K 400/800 | 01 RAM, one load (build_one16): stage 1 (ONE16) tests the RAM above the image, then stage 2, inserted in the same image, page-tests stage 1's RAM through the screen block (`src/common/pagetest.asm`) and shows the summary; START reruns from stage 1's `again`. 02 system: all seven tests in one 72-record load, with a menu (START runs, SELECT down, OPTION up, 1-7 jump; after a test the next one is highlighted; ALL runs every test). |
+| `diag-32k-xl-xe` (built) | 32K/48K 800, XL/XE | One load, 142 records (build_one32): stage 1 at $0800, stage 2 at $1A00, the system tests at $2C00, shared BSS $4F00, screen $5000 (display list $53C0). Stage 1 tests the RAM above the image; stage 2 page-tests the image's RAM, then the RAM under the OS and the 130XE banks; then the system tests and menu, with RAM faults as test 8 and menu key 0 (RAMAGAIN) rerunning stage 1. The ROM test turns ANTIC off while the self-test ROM covers $5000-$57FF. It replaced the 48k+ tape (`build_oneload`, kept in build.py but not built). |
+| `diag-controls` (built) | 16K+ | The keyboard, joystick and paddle tests only (SETNO 3), no harness: a companion to the SALT disks. |
+| `diag-400-memtest`, `diag-memtest` (built) | 8K / 16K+ | The memory test (burn-in), one load each. The 8K one (OWNTEST, NOXL, NORAMK) re-checks its own image sum every pass. It then page-tests its own RAM: each page is saved in the screen block, given March C- and an address-in-page test, restored and read back. The screen block gets a visible sweep: each row inverted, held two frames, checked, restored and checked. Both are position-independent routines (branches and (zp),y only) copied to $0400-$04FF. The 16K+ one (BOUNCE) swaps between two relocated copies every pass, $20 pages apart on the 400/800 and at $8000 on the XL/XE, so its own RAM gets the full tests too. It falls back to the page test when copy B doesn't fit (16K). Not covered: page $FF under the XL/XE OS. |
 
 The system tapes are built from one `src/system/main.asm`, with a file per
 test (`t_rom`, `t_kb`, `t_con`, `t_joy`, `t_pad`, `t_pok`, `t_gtia`). The
-WANT_* defines pick which tests a tape gets, so the 16k/48k sets reuse the same
+WANT_* defines pick which tests a tape gets, so the 16k and 32k+ tapes reuse the same
 files. A test keeps its number, and so its beep code, on every tape.
 
 Every set still tests the RAM its own code occupies. On the 400 that means
 relocating a small march into the screen block with the screen off, and
 reporting by beeps.
 
-Test menu (16k/48k): START runs the highlighted line, SELECT moves down,
-OPTION moves up, and 1-7 jump to a test. "ALL OF THEM, IN ORDER" is
+Test menu (16k, 32k+): START runs the highlighted line, SELECT moves down,
+OPTION moves up, and 1-7 jump to a test (32k+: 0, or its own line, reruns
+the RAM test). "ALL OF THEM, IN ORDER" is
 highlighted at power-on. After a test the next one is highlighted.
 
 No timeouts after the first screen check (Mike, 2026-11-07: they only
@@ -368,7 +370,8 @@ identified on its own, so a repaired board with mixed revisions shows which
 chip is which. Anything that matches nothing is UNKNOWN; the raw CRC32 is
 always shown.
 
-New test areas (16k/48k; 8K where they fit). "Auto" means the test passes or
+New test areas (16k/32k+; 8K where they fit). None of these are built yet
+except the P/M-and-DLI sprite check in the GTIA test (item 2). "Auto" means the test passes or
 fails without asking the user:
 - **ANTIC:**
   - every mode 2-F shown, labelled, and answered Y/N
@@ -389,3 +392,11 @@ fails without asking the user:
 Open: which of these are wanted, and in what order; whether the remaining
 400 tests (ROM, POKEY, joysticks, paddles, GTIA) become extra single-stage
 `diag-400` tapes.
+
+## 14. Status at v0.1.1 (2026-11-08)
+
+Every tape has passed on the MiSTer Atari800 core: the 400 set, the 16k
+set, `diag-32k-xl-xe` (800XL rev 2 OS with 64K, and a 130XE setup with
+128K), both memory tests and `diag-controls`. Not yet run on real
+hardware. Tape is the low-spec version; a disk version is planned, for
+faster loading on machines with a working drive.

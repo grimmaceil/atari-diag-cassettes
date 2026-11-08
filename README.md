@@ -9,6 +9,15 @@ It reports by **border colour and beeps** first, so it works even when the
 picture doesn't. Text appears on screen once the screen itself has been
 checked.
 
+**Why cassette:** a cassette boot needs the least of the machine: no disk
+drive, no DOS, just the computer, its OS and the first few K of RAM. So it
+runs on an 8K Atari 400 and on machines too sick to boot a disk. Tape is
+slow (about 3K a minute), so there are several sets, one per RAM size, each
+as few and as short loads as that much RAM allows. **A disk version is
+planned**, for faster loading on machines with a working drive.
+
+Version 0.1.1.
+
 ![The menu](docs/img/system-01-menu.png)
 
 ## Get started
@@ -17,9 +26,9 @@ checked.
 
    | Your machine | Tapes (in `cassettes/`) |
    |---|---|
-   | 400 with 8K | `diag-400-01-ram` to `diag-400-05-av`, then `diag-400-memtest` |
-   | 400/800 with 16K | `diag-16k-01-ram`, `diag-16k-02-system`, `diag-memtest` |
-   | 800 with 32K-48K, XL, XE | `diag-32k-xl-xe` (one tape), `diag-memtest` |
+   | 400 with 8K | `diag-400-01-ram` to `diag-400-05-av` (about 2 min each), then `diag-400-memtest` |
+   | 400/800 with 16K | `diag-16k-01-ram`, `diag-16k-02-system` (about 3.5 min each), `diag-memtest` |
+   | 800 with 32K-48K, XL, XE | `diag-32k-xl-xe` (one tape, about 6 min), `diag-memtest` |
    | anything that won't get through its own set | the 400 set |
    | keyboard, joysticks, paddles only (16K+) | `diag-controls`: no test harness needed; goes with Atari's SALT disks |
 
@@ -32,6 +41,28 @@ checked.
 
 **[The user guide](docs/USER-GUIDE.md)** explains every screen, the colours
 and beeps, loading from a PC, and what to do when something fails.
+
+## Versions
+
+- **0.1.1** (2026-11-08)
+  - The 16k RAM tape and the 32k+ tape (it replaces the 48k+ tape) are one
+    load each, and test their own RAM too. The 32k+ menu has `0 RAM TEST
+    AGAIN`.
+  - The machine's real RAM is reported (64K on an 800XL, 128K on a 130XE),
+    a plugged-in cartridge shows as `CART IN`, and XL/XE BASIC is switched
+    off for the RAM test.
+  - Every screen's title bar names the tape; the `FOUND:` line below it is
+    what the tape detected.
+  - GTIA test: the word ATARI in players and missiles, scrolling, with a
+    display-list-interrupt rainbow.
+  - New `diag-controls` tape: keyboard, joysticks and paddles only.
+  - At the end of a tape, START runs the tests again; the ROM test waits for
+    a key so you can read it; the summaries name the next tape.
+  - The burn-in is renamed the memory test (`diag-memtest`,
+    `diag-400-memtest`).
+  - Fixed: the keyboard test's stray lines on the INV key; a scrambled
+    screen in the 32k+ tape's ROM test on the XL/XE.
+- **0.1** (2026-11-07): the first release.
 
 ## For developers
 

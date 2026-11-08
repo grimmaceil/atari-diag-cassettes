@@ -83,7 +83,7 @@ ANNOT = {
     'ram-02-testing': [(2, 3, 1), (5, 5, 2)],
     'ram-03-pass': [(4, 4, 1), (6, 9, 2), (20, 21, 3), (23, 23, 4)],
     'ram-04-summary': [(5, 7, 1), (8, 11, 2), (14, 16, 3)],
-    'ram-05-fail': [(4, 4, 1), (6, 7, 2), (20, 20, 3)],
+    'ram-05-fail': [(4, 4, 1), (6, 7, 2), (20, 21, 3)],
     'rom-01-400': [(5, 7, 1), (8, 8, 2), (9, 9, 3), (21, 23, 4)],
     'rom-02-xl': [(5, 5, 1), (6, 6, 2), (7, 7, 3), (21, 23, 4)],
     'input-01-keyboard': [(8, 12, 1), (13, 13, 2), (14, 14, 3)],
@@ -206,6 +206,8 @@ def main():
                     annotate(pic, ANNOT[pic])
             if missing and err.strip():
                 print('   ', err.strip().splitlines()[-1])
+    for pic, marks in ANNOT.items():    # every picture again, timed shots too
+        annotate(pic, marks)            # (a --shot run lists no pictures)
 
 
 if __name__ == '__main__':

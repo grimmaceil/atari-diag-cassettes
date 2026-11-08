@@ -1,7 +1,7 @@
 # Development
 
-This is for anyone who wants to build the tapes from source, change them, or
-check how they work. To test a machine you only need the `.cas` files in
+Version 0.1.1. This is for anyone who wants to build the tapes from source,
+change them, or check how they work. To test a machine you only need the `.cas` files in
 `cassettes/` and the [user guide](USER-GUIDE.md).
 
 ## Authorship
@@ -32,6 +32,12 @@ python tools/build.py --nodeploy   # the same, without copying the changed tapes
 python tools/build.py --fault 2,5  # extra builds with a stuck bit 5 in bank 2, to hear a fail code
 python tools/build.py --fast       # skip the $55/$AA march pass (quicker runs)
 ```
+
+Every build copies the release tapes that changed to the share
+(`SHARE` in `tools/build.py`, the MiSTer core's `_diag` folder), so a new
+build can be tried on the MiSTer at once. A copy that fails (the share
+offline, or a tape in use) prints `NOT deployed` and the build goes on.
+FAST and fault builds are never copied.
 
 `tools/build.py` holds the list of tapes (`TAPES`) and the share path
 (`SHARE`). Some tapes need more than a plain assemble:
@@ -79,6 +85,12 @@ scan line and a floating bus. It models:
   without them. `--forge` gives the made-up 400/800 OS chips chosen CRC32s,
   to test the ROM names.
 
+It doesn't model ANTIC running a display list from memory that changes
+under it: the screen picture always comes from the display list the program
+set up. So a fault where ANTIC goes astray (as the 32k+ ROM test once did,
+with the self-test ROM switched in over its screen) only shows on the
+MiSTer or real hardware.
+
 It prints the screen as text, decodes the beep code, and can save the screen
 as a picture. `--auto` answers the prompts as a person would; `--menuwalk`
 runs the menu's tests one by one.
@@ -98,6 +110,13 @@ scenarios in parallel, one process each.
 the screens in `docs/img/`. It needs real ROMs (`--sysroms`) for the font and
 the ROM names, and the MiSTer core's palette file (`--palette`, `ntsc.act`),
 so the colors are the core's. Neither is in this repository.
+
+Each scenario in `RUNS` takes a picture a set time after some text first
+shows on screen. A trigger that starts with `^` must be at the start of a
+screen row: the RAM tapes' page test shows the program's own pages,
+strings and all, in the top rows, which would trip a plain match. `ANNOT`
+holds the numbered callouts; `--annotate` redraws them without running the
+simulator. The raw screens go to `docs/img/raw/` (not in git).
 
 ## Attributions
 
