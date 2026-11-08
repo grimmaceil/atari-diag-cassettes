@@ -26,9 +26,9 @@ OSXL = 'Atari XL-XE OS rev 2 - 800XL 65XE 130XE - 1983-05-10 - CRC 1F9CD270.rom'
 BASIC = 'BASIC - Revision A.rom'
 
 # name: (tape, simulator arguments, [(screen text, delay s, picture)]). The
-# RAM tape runs on 16K and the 48k+ tape from a FAST build (build_oneload with
-# FAST=1, made by hand into build/): the same screens, a fraction of the
-# simulator's time (py65 is slow on a 48K march).
+# one-load 16k and 32k+ tapes run from FAST builds (build_one16/build_one32
+# with FAST=1, made by fastbuilds() into build/): the same screens, a fraction
+# of the simulator's time (py65 is slow on a big march).
 RUNS = {
     'ram-pass': ('diag-400-01-ram', ['--ram', '0x4000', '--key', '10', '--until', '300'], [
         ('CAN YOU READ', 2, 'ram-01-video-check'),
@@ -39,9 +39,9 @@ RUNS = {
         ('BITS D4', 1, 'ram-05-fail')]),
     'rom-400': ('diag-400-02-rom', ['--ram', '0xA000', '--auto', '--basic', '@BASIC',
                                     '--until', '60'], [
-        ('NAMED FROM', 1, 'rom-01-400')]),
+        ('TEST 1 PASS', 1, 'rom-01-400')]),
     'rom-xl': ('diag-400-02-rom', ['--xl', '--auto', '--basic', '@BASIC', '--until', '60'], [
-        ('NAMED FROM', 1, 'rom-02-xl')]),
+        ('TEST 1 PASS', 1, 'rom-02-xl')]),
     'input': ('diag-400-03-input', ['--auto', '--until', '90'], [
         ('KEYS LEFT 2', 0.1, 'input-01-keyboard'),
         ('HEARD IT?', 1, 'input-02-console'),
@@ -57,17 +57,23 @@ RUNS = {
     'menu': ('diag-16k-02-system', ['--ram', '0x8000', '--auto', '--until', '400'], [
         ('SELECT=DOWN', 0.5, 'system-01-menu'),
         ('START=MENU', 1, 'system-02-results')]),
-    '48k': ('build/docs-48k-fast', ['--xl', '--auto', '--basic', '@BASIC', '--until', '900'], [
-        ('IMAGE AREA', 2, '48k-01-image-area'),
-        ('START=MENU', 1, '48k-02-results')]),
-    'burnin': ('diag-burnin', ['--ram', '0x8000', '--stuck', '22F8-22FF:3:1',
-                               '--flaky', '3:2:0.00002', '--key', '150', '--until', '220'], [
-        ('PASS 4', 3, 'burnin-01-running'),
-        ('FIX SOLID', 1, 'burnin-02-summary')]),
+    '16k': ('build/t16-fast', ['--ram', '0x4000', '--key', '10', '--until', '400'], [
+        ('START=AGAIN', 2, '16k-01-summary')]),
+    '32k-sum': ('build/t32-fast', ['--xl', '--basic', '@BASIC', '--key', '10',
+                                   '--until', '600'], [        # (no --auto: it waits)
+        ('START=SYSTEM TESTS', 2, '32k-01-summary')]),
+    '32k': ('build/t32-fast', ['--xl', '--auto', '--basic', '@BASIC', '--key', '10',
+                               '--until', '1200'], [
+        ('SELECT=DOWN', 0.5, '32k-02-menu'),
+        ('START=MENU', 1, '32k-03-results')]),
+    'memtest': ('diag-memtest', ['--ram', '0x8000', '--stuck', '23FC-23FF:3:1',
+                                 '--key', '150', '--until', '220'], [
+        ('PASS 4', 3, 'memtest-01-running'),
+        ('FIX SOLID', 1, 'memtest-02-summary')]),
     # the screen sweep is timed, not text-triggered: at 10 s on 8K it is on
     # row 13 (the save-page churn and the sweep alternate every pass)
-    'burnin-sweep': ('diag-400-burnin', ['--ram', '0x2000', '--until', '11',
-                                         '--shot', '10:@RAW/burnin-03-sweep.png'], []),
+    'memtest-sweep': ('diag-400-memtest', ['--ram', '0x2000', '--until', '11',
+                                           '--shot', '10:@RAW/memtest-03-sweep.png'], []),
 }
 
 # The guide's callouts: picture -> [(first text row, last text row, number)].
@@ -78,8 +84,8 @@ ANNOT = {
     'ram-03-pass': [(4, 4, 1), (6, 9, 2), (20, 21, 3), (23, 23, 4)],
     'ram-04-summary': [(5, 7, 1), (8, 11, 2), (14, 16, 3)],
     'ram-05-fail': [(4, 4, 1), (6, 7, 2), (20, 20, 3)],
-    'rom-01-400': [(5, 7, 1), (8, 8, 2), (9, 9, 3), (13, 13, 4), (21, 23, 5)],
-    'rom-02-xl': [(5, 5, 1), (6, 6, 2), (7, 7, 3)],
+    'rom-01-400': [(5, 7, 1), (8, 8, 2), (9, 9, 3), (21, 23, 4)],
+    'rom-02-xl': [(5, 5, 1), (6, 6, 2), (7, 7, 3), (21, 23, 4)],
     'input-01-keyboard': [(8, 12, 1), (13, 13, 2), (14, 14, 3)],
     'input-02-console': [(5, 6, 1), (8, 8, 2), (11, 12, 3)],
     'input-04-fail': [(8, 12, 1), (13, 13, 2), (14, 14, 3), (21, 21, 4), (23, 23, 5)],
@@ -89,11 +95,13 @@ ANNOT = {
     'av-02-gtia': [(3, 3, 1), (5, 11, 2), (13, 20, 3), (21, 21, 4)],
     'system-01-menu': [(4, 10, 1), (11, 11, 2), (12, 12, 3), (18, 19, 4)],
     'system-02-results': [(4, 10, 1), (12, 16, 2)],
-    '48k-01-image-area': [(2, 3, 1), (5, 5, 2)],
-    '48k-02-results': [(4, 10, 1), (11, 11, 2), (13, 16, 3)],
-    'burnin-01-running': [(5, 5, 1), (6, 6, 2), (8, 9, 3), (23, 23, 4)],
-    'burnin-02-summary': [(5, 6, 1), (8, 9, 2)],
-    'burnin-03-sweep': [(13, 13, 1)],
+    '16k-01-summary': [(5, 7, 1), (8, 11, 2), (14, 16, 3), (23, 23, 4)],
+    '32k-01-summary': [(5, 7, 1), (8, 12, 2), (14, 16, 3), (23, 23, 4)],
+    '32k-02-menu': [(4, 10, 1), (11, 11, 2), (12, 12, 3), (18, 19, 4)],
+    '32k-03-results': [(4, 10, 1), (11, 11, 2), (13, 16, 3)],
+    'memtest-01-running': [(5, 5, 1), (6, 6, 2), (8, 9, 3), (23, 23, 4)],
+    'memtest-02-summary': [(5, 6, 1), (8, 9, 2)],
+    'memtest-03-sweep': [(13, 13, 1)],
 }
 
 
@@ -162,12 +170,23 @@ def swatches(palette):
     return out
 
 
+def fastbuilds():
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import build
+    build.build_one16('t16-fast', {'FAST': 1}, 'T16 FAST')
+    build.build_one32('t32-fast', {'FAST': 1}, 'T32 FAST')
+    build.main.__globals__['sys'].argv = ['build.py']
+    subprocess.run([sys.executable, str(ROOT / 'tools' / 'build.py')], check=True,
+                   capture_output=True)    # the release tapes back in cassettes/
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--sysroms', type=Path, default=SHARE / '_sysroms')
     ap.add_argument('--palette', type=Path, default=SHARE / 'ntsc.act')
     ap.add_argument('--only', action='append')
     ap.add_argument('--annotate', action='store_true', help='only redraw the callouts')
+    ap.add_argument('--nofast', action='store_true', help='use the FAST builds already in build/')
     a = ap.parse_args()
     if a.annotate:
         for pic, marks in ANNOT.items():
@@ -177,6 +196,8 @@ def main():
     for c in swatches(a.palette):
         print(f"{c['name']:10s} {c['atari']}  {c['rgb']}")
     names = a.only or list(RUNS)
+    if {'16k', '32k', '32k-sum'} & set(names) and not a.nofast:
+        fastbuilds()
     with ThreadPoolExecutor(len(names)) as ex:
         for name, got, missing, err in ex.map(lambda n: run(n, a.sysroms, a.palette), names):
             print(f'{name}: {len(got)} pictures' + (f', MISSING {missing}' if missing else ''))

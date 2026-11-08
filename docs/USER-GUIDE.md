@@ -156,12 +156,17 @@ means the tape didn't load correctly into RAM (a bad image checksum): see
 | SELECT | play the beep code again |
 | OPTION | switch between the text screen and full-screen flashes (the whole screen flashes with the code: easier to see when the picture is garbled) |
 
-A test that passes moves on by itself after about 2 seconds. At the end of a
-tape (except the 400 RAM tape and the memory tests) the results stay up: START runs
-that tape's tests again from the first one, or goes back to the menu on the
-16K and 32K tapes. The 16K RAM tape's START runs the whole RAM test again. After the
-opening screen check, no question has a time limit: every question waits
-until you answer it, with a purple border.
+A test that passes moves on by itself after about 2 seconds, except the ROM
+test, which waits so you can read the names and checksums. At the end of a
+tape the results stay up until you press START:
+- the 400 tapes 02-05 and `diag-controls`: START runs that tape's tests again
+- the menu tapes (`diag-16k-02-system`, `diag-32k-xl-xe`): START goes back to
+  the menu
+- `diag-16k-01-ram`: START runs the whole RAM test again
+- `diag-32k-xl-xe`'s RAM summary: START goes on to the system tests
+
+After the opening screen check, no question has a time limit: every question
+waits until you answer it, with a purple border.
 
 ## The tapes, screen by screen
 
@@ -172,7 +177,7 @@ until you answer it, with a purple border.
 ![Video check](img/ram-01-video-check.png)
 
 1. The question. If you can read it and see eight colour bars, press any
-   key (or START, SELECT, OPTION or fire).
+   key or the joystick button.
 2. Seconds left. With no answer the border turns purple, a siren sounds for
    a moment and a 10 s last chance starts. Without an answer the test goes
    on anyway, and the results say "video not confirmed".
@@ -189,7 +194,8 @@ machine with a lot of RAM this takes a few minutes.
 1. The machine and the RAM found.
 2. The bank being tested now.
 
-**Result.**
+**Result** (the 400 tape; the 16K and 32K tapes go straight on to the
+summary below).
 
 ![RAM test passed](img/ram-03-pass.png)
 
@@ -198,21 +204,35 @@ machine with a lot of RAM this takes a few minutes.
 3. The overall result, and whether you confirmed the video.
 4. The keys (see [Keys during a result](#keys-during-a-result)).
 
-When a bank fails, its line says FAIL and lists the bad data bits (for
-example `BITS D4`), and the border goes red while the code plays. On an
-800XL each data bit is one RAM chip; see
-[When something fails](#when-something-fails).
+When a bank fails, its line shows the bad data bits:
 
-**Summary** (machines with 16K or more). The second part of the tape tests
-the RAM the first part ran in, then on an XL/XE the RAM under the operating
-system and, on a 130XE, the four extra banks. Then it shows everything:
+![RAM test failed](img/ram-05-fail.png)
 
-![RAM summary](img/ram-04-summary.png)
+1. How to read the code.
+2. The failed bank and its bad bits. On an 800XL each data bit is one RAM
+   chip; see [When something fails](#when-something-fails).
+3. The overall result. The border is red while the code plays: here long
+   ×1 (bank 1), short ×5 (bit D4).
+
+**Summary** (machines with 16K or more). Next the tape tests the RAM it
+runs in itself (the "loader area"), then on an XL/XE the RAM under the
+operating system and, on a 130XE, the four extra banks. Then it shows
+everything. On the 400 tape the second part does this:
+
+![RAM summary, 400 tape](img/ram-04-summary.png)
+
+On `diag-16k-01-ram` it's all one load: the tape tests its own RAM page by
+page, moving each page into the screen (the top rows show a jumble for a
+moment), testing it and putting it back. The summary waits for you:
+
+![RAM summary, 16K tape](img/16k-01-summary.png)
 
 1. Low RAM, the display checks and the video check.
-2. Every bank, the area the first part ran in, the RAM under the OS (XL/XE)
-   and the 130XE banks.
-3. The number of failures and what to do next.
+2. Every bank, and the area the tape itself ran in. On an XL/XE also the RAM
+   under the OS, and on a 130XE the extra banks.
+3. The number of failures and what to do next. A failure shows its first
+   bad address and bits, with a hint (one bit: one RAM chip).
+4. START runs the whole RAM test again.
 
 ### ROMs (`diag-400-02-rom`; test 1 in the system tapes)
 
@@ -221,13 +241,14 @@ it up in a table of known Atari ROMs.
 
 ![ROMs on a 400/800](img/rom-01-400.png)
 
-1. The 400/800's three OS chips, each named on its own. A repaired board
-   can have chips from different revisions; the test spots that (item 5).
+1. The 400/800's three OS chips, each named on its own, with its CRC32. A
+   repaired board can have chips from different revisions; the test spots
+   that (item 5).
 2. A cartridge, if one is plugged in (here BASIC rev A). "NONE" is not a
    fault.
 3. The character set's checksum.
-4. Where the names come from.
-5. The result.
+4. The result. The ROM test waits here until you press a key, so you can
+   read the names.
 
 On an XL/XE the OS is one 16K chip, named as a whole:
 
@@ -238,6 +259,10 @@ On an XL/XE the OS is one 16K chip, named as a whole:
 2. BASIC, built into the XL/XE. A BASIC or cartridge the table doesn't know
    shows "NOT IN THE TABLE" and is not a fault.
 3. The character set's checksum.
+4. The result.
+
+The names come from published tables of Atari's own ROMs (see
+[DEVELOPMENT.md](DEVELOPMENT.md)), not from any one machine.
 
 Items: 1 the OS reads differently twice; 2 BASIC or the cartridge reads
 differently twice; 3 an unknown OS; 4 the character set reads differently
@@ -344,6 +369,7 @@ On machines with 16K or more, all seven tests are on one tape with a menu.
 4. The keys: START runs the highlighted line, SELECT moves down, OPTION
    moves up, and 1-7 run that test. After a test the next one is
    highlighted, so pressing START again and again goes through them all.
+   On `diag-32k-xl-xe`, 0 runs the whole RAM test again.
 
 Running a test again replaces its old result.
 
@@ -359,11 +385,28 @@ One tape, one load, for an 800 with 32K or 48K and every XL and XE:
 2. The program's own RAM, page by page: each page is moved into the screen
    (the top rows show a jumble for a moment), tested, and put back.
 3. On an XL/XE: the RAM under the OS and, on a 130XE, the four extra banks.
-4. The seven tests, with the menu.
+4. The RAM summary, which waits for you:
+
+![32K RAM summary](img/32k-01-summary.png)
+
+1. Low RAM, the display checks and the video check.
+2. Every bank, the area the tape ran in, and here (an XL) the RAM under the
+   OS.
+3. The result and what's next.
+4. START goes on to the system tests.
+
+5. The seven tests, with the menu. 0 runs the RAM test again:
+
+![32K menu](img/32k-02-menu.png)
+
+1. The tests.
+2. All of them, in order.
+3. The results.
+4. The keys, with 0 for the RAM test.
 
 At the end, RAM faults show up again as test 8, with the bank as the item:
 
-![Results](img/48k-02-results.png)
+![32K results](img/32k-03-results.png)
 
 1. The seven tests.
 2. Test 8: the RAM. FAIL with the bank numbers if any RAM failed; the code
@@ -372,13 +415,14 @@ At the end, RAM faults show up again as test 8, with the bank as the item:
 
 ### Memory test (`diag-memtest`, `diag-400-memtest`)
 
-The memory test (a burn-in) repeats the RAM tests until you press a key: leave it running
+The memory test (a burn-in) repeats the RAM tests until you press a key:
+leave it running
 for an hour or a day to catch faults that only show when the machine is
 warm. It keeps a clock, counts passes, and logs every bad bit: in which
 pass it first failed, and in how many passes since. A bit that failed every
 time is **solid**; one that only fails sometimes is **intermittent**.
 
-![Memory test running](img/burnin-01-running.png)
+![Memory test running](img/memtest-01-running.png)
 
 1. The pass number and how long it has run.
 2. What it's testing now.
@@ -389,7 +433,7 @@ time is **solid**; one that only fails sometimes is **intermittent**.
 The border shows the state so far: green no errors, red solid errors only,
 yellow if anything intermittent has been seen.
 
-![Memory test summary](img/burnin-02-summary.png)
+![Memory test summary](img/memtest-02-summary.png)
 
 1. Passes, time and the result.
 2. The log.
@@ -406,7 +450,7 @@ Every pass, both memory tests also test the screen's own RAM where you can see
 it: an inverse bar runs down the screen, one row at a time. Each row is
 inverted, held for two frames, checked, put back and checked again.
 
-![The screen sweep](img/burnin-03-sweep.png)
+![The screen sweep](img/memtest-03-sweep.png)
 
 1. The row being tested. A blank row shows as a row of arrows: that's what
    a space looks like with every bit flipped.

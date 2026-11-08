@@ -46,6 +46,6 @@ childhood. Even so, all of the code and documents here are, for now, 100%
 written by AI (Claude, by Anthropic). The author directs the work, reviews
 it and tests it on hardware.
 
-Version 0.1. Tested on a MiSTer Atari800 core and in the project's
+Tested on a MiSTer Atari800 core and in the project's
 simulator; not yet on a real 400, 800, XL or XE. Issues and pull requests
 are the way to reach the author; email is not checked.
