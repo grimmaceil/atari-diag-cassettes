@@ -576,8 +576,16 @@ s_l2_sio dta d'ERROR $',$FF
 s_l2_hdr dta d'NOT ON TAPE',$FF
 s_l2_sum dta d'BAD CHECKSUM',$FF
 	.else
+	.ifdef ONE32
+s_nextok dta d'ALL PASSED. START: THE SYSTEM TESTS',$FF
+s_nextbad dta d'FIX THIS FIRST, OR START: SYSTEM TESTS',$FF
+	.elseif .def ONE16
+s_nextok dta d'ALL PASSED. NEXT: DIAG-16K-02-SYSTEM',$FF
+s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
+	.else
 s_nextok dta d'ALL PASSED. NEXT: TAPE 02 OF THE SET',$FF
 s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
+	.endif
 	.endif
 	.ifdef ONE32
 s_toggle2 dta d'START=SYSTEM TESTS  SELECT=RE-BEEP',$FF
