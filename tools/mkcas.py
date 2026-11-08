@@ -88,6 +88,19 @@ def load_image(path):
     return img, nrec, img[2] | img[3] << 8
 
 
+def patch_boot(bin_path, lab_path):
+    """Put the image sum into a boot image's last two bytes, in place
+    (mkcas and mkxex). Returns the image, its records, load address, sum."""
+    img, nrec, load = load_image(bin_path)
+    lab = read_labels(lab_path)
+    if load != lab['LOAD'] or lab['CKSUM'] - load != len(img) - 2:
+        sys.exit('boot image layout does not match the label table')
+    s = image_sum(img, load, lab['CK_OP'])
+    img[-2:] = struct.pack('<H', s)
+    open(bin_path, 'wb').write(img)
+    return img, nrec, load, s
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('cas')
@@ -97,13 +110,7 @@ def main():
     ap.add_argument('--name', default='A8 DIAG')
     a = ap.parse_args()
 
-    img, nrec, load = load_image(a.boot[0])
-    lab = read_labels(a.boot[1])
-    if load != lab['LOAD'] or lab['CKSUM'] - load != len(img) - 2:
-        sys.exit('boot image layout does not match the label table')
-    s = image_sum(img, load, lab['CK_OP'])
-    img[-2:] = struct.pack('<H', s)
-    open(a.boot[0], 'wb').write(img)
+    img, nrec, load, s = patch_boot(a.boot[0], a.boot[1])
 
     out = chunk(b'FUJI', 0, a.name.encode('ascii'))
     out += chunk(b'baud', 600)

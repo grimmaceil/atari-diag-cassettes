@@ -1180,7 +1180,11 @@ NPAT	= *-pats
 	.ifdef NOXL			; the tape's name
 s_hpre	dta d' DIAG-400-MEMTEST  ',$FF
 	.else
+	.ifdef XEX			; the disk file (build.py)
+s_hpre	dta d' DIAG-MEMTEST-XEX  ',$FF
+	.else
 s_hpre	dta d' DIAG-MEMTEST  ',$FF
+	.endif
 	.endif
 s_hburn	dta d'MEMTEST',$FF
 s_hsum	dta d'SUMMARY',$FF

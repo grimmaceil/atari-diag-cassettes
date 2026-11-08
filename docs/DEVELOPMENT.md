@@ -1,8 +1,8 @@
 # Development
 
-Version 0.1.2. This is for anyone who wants to build the tapes from source,
+Version 0.2. This is for anyone who wants to build the tapes from source,
 change them, or check how they work. To test a machine you only need the `.cas` files in
-`cassettes/` and the [user guide](USER-GUIDE.md).
+`cassettes/` (or the `.xex` files in `disks/`) and the [user guide](USER-GUIDE.md).
 
 ## Authorship
 
@@ -27,7 +27,7 @@ The tapes were built and tested with:
 ## Building
 
 ```
-python tools/build.py              # every tape: build/ (all output), cassettes/ (the release tapes)
+python tools/build.py              # every tape and disk file: build/ (all output), cassettes/ and disks/ (the releases)
 python tools/build.py --nodeploy   # the same, without copying the changed tapes to the MiSTer share
 python tools/build.py --fault 2,5  # extra builds with a stuck bit 5 in bank 2, to hear a fail code
 python tools/build.py --fast       # skip the $55/$AA march pass (quicker runs)
@@ -55,10 +55,27 @@ at least its RAM, and stops clearly on a smaller one. Some tapes need more than 
   assembling at $0800 and at $0C00. The build then proves it, byte for
   byte, against the code assembled at both addresses the second copy can
   go to.
-- `build_oneload` (the earlier 48k+ tape: stage 1 at $4000 with a payload
-  copied down to $0800) is kept but no longer in `TAPES`.
 - The two-stage tapes: `tools/mkcas.py` writes each stage as its own file on
   the tape, with an end-of-file record after each.
+
+### Disk files
+
+`XEXES` in `tools/build.py` lists them: the 32k+ tape and `diag-memtest`,
+built again by the same builders with `XEX=1` and wrapped by
+`tools/mkxex.py`. XEX changes only the title bar and leaves out NEEDPG;
+everything it changes is under `.ifdef XEX`, so the tapes build
+byte-identical (check: `git status cassettes/` shows nothing after a
+build). The image still runs at $0800, where DOS lives while the file
+loads, so the file has three parts (`src/disk/xexwrap.asm`):
+1. the guard at $2000 with INITAD: RAMTOP below the need, or MEMLO above
+   $2000, shows one line and halts (red border, the low tone on and off);
+   else it returns and the load goes on;
+2. the image (with its checksum, as on tape) at $2000, over the guard;
+3. the mover just past the image with RUNAD: interrupts off, the image
+   copied down to $0800, COLDST = 1 (RESET then starts the machine from
+   cold: DOS is gone), and a jump to $0806, the cassette boot's entry.
+
+The design and its reasons: `Atari-diag-disk-scope.md`.
 
 `tools/gen_kbmap.py` regenerates `src/system/kbmap.asm`, the keyboard map.
 
@@ -69,10 +86,13 @@ at least its RAM, and stops clearly on a smaller one. Some tapes need more than 
 | `src/common/` | shared code: boot (alive, checksum, low RAM test, size probe), display checks, the beep and flash reporter, the text screen, the RAM tests, XL/XE RAM, the stage loader |
 | `src/tape1/` | the RAM tape: stage 1, and stage 2 (relocated test, RAM under the OS, 130XE banks) |
 | `src/tape2/` | the memory test (one source, two builds: `diag-400-memtest` with OWNTEST and NOXL, `diag-memtest` with BOUNCE) |
+| `src/disk/` | the disk files' guard and mover (`xexwrap.asm`) |
 | `src/system/` | the system tests: `main.asm` builds a tape from the tests that `WANT_*` defines pick; one file per test (`t_rom`, `t_kb`, `t_con`, `t_joy`, `t_pad`, `t_pok`, `t_gtia`); `common.asm` has the test flow and the menu |
 | `tools/` | build, CAS writer, simulator, keyboard map, documentation pictures |
 | `cassettes/` | the release tapes |
+| `disks/` | the release disk files |
 | `Atari-diag-cassette-scope.md` | the design: constraints, the feedback code, memory use, the ROM table, open items |
+| `Atari-diag-disk-scope.md` | the disk port's design |
 
 ## The simulator
 
@@ -80,6 +100,9 @@ at least its RAM, and stops clearly on a smaller one. Some tapes need more than 
 scan line and a floating bus. It models:
 - the cassette boot, and later stages read through a stand-in for the OS's
   SIOV
+- a `.xex` loaded as DOS loads it: segment by segment, INITAD after a
+  segment that sets it, RUNAD at the end; `--memlo` sets MEMLO (default
+  $1CFC, DOS 2.5)
 - RAMTOP ($6A) as the OS sizes it at power-on: `--ram`, capped at $A000
   with `--basic`
 - RAM faults: stuck bits (`--stuck`), flaky bits (`--flaky`), mirrored banks
@@ -105,6 +128,7 @@ runs the menu's tests one by one.
 python tools/sim.py cassettes/diag-400-03-input.cas --auto --until 90
 python tools/sim.py cassettes/diag-400-01-ram.cas --stuck 2:5:1 --until 200
 python tools/sim.py cassettes/diag-32k-xl-xe.cas --xl --auto --until 900
+python tools/sim.py disks/diag-32k-xl-xe.xex --ram 0x4000 --until 4 --snap 3.5   # the guard
 ```
 
 A run takes minutes: py65 is pure Python. `tools/docshots.py` runs its

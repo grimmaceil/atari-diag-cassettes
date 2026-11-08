@@ -1,6 +1,6 @@
 # A8 Cassette Diagnostics: User Guide
 
-Version 0.1.2
+Version 0.2
 
 These tapes test any Atari 8-bit computer: the 400, 800, 1200XL, 600XL,
 800XL, 65XE, 800XE, 130XE and XE Game System. You load them like any
@@ -10,7 +10,8 @@ checked. So they're still useful when the picture is bad.
 
 You don't need to know any programming. You need the `.cas` files from the
 `cassettes` folder and a way to play them into the machine (see
-[Loading a tape](#loading-a-tape)).
+[Loading a tape](#loading-a-tape)). With a disk drive, two of them also
+come as disk files, in the `disks` folder (see [From disk](#from-disk)).
 
 Pictures in this guide come from the project's simulator, using the MiSTer
 Atari800 core's NTSC palette and a real Atari OS font. The colours and
@@ -178,6 +179,45 @@ this problem.
 The `.cas` files can be turned into audio (a `.wav` file) with a CAS-to-WAV
 converter, and the audio recorded onto a tape for an Atari 410 or 1010
 recorder. This hasn't been tried with these tapes yet.
+
+### From disk
+
+Two of the tapes also come as Atari binary files (`.xex`), in the `disks`
+folder. They load in seconds, not minutes:
+
+| File | Same tests as | Needs |
+|---|---|---|
+| `diag-32k-xl-xe.xex` | the `diag-32k-xl-xe` tape: everything, with the menu | 32K |
+| `diag-memtest.xex` | the `diag-memtest` tape | 16K |
+
+To load one:
+
+- **MiSTer:** load the `.xex` from the core's menu (its XEX loader). No
+  cassette boot and no DOS disk needed.
+- **A DOS disk** (Atari DOS 2.0S or 2.5, or MyDOS): copy the file onto it,
+  boot DOS, and load it with the binary load option (`L` in the DOS 2
+  menu).
+- **A PC or FujiNet:** AspeQt, SIO2SD and FujiNet can boot an `.xex`
+  straight from their own menus.
+
+Take any cartridge out first, as for a tape. You don't need to hold OPTION:
+the tests switch an XL or XE's BASIC off themselves. Everything on screen is
+the same as on the tape, except the title bar: ` DIAG-32K-XEX ` and
+` DIAG-MEMTEST-XEX `.
+
+If the file can't run, it says so before it loads, with a red border and
+the low tone on and off:
+
+- `NEEDS 32K RAM. THIS MACHINE HAS 16K.`: too little RAM. Use the tapes
+  for a smaller machine.
+- `DOS IS IN THE WAY: USE DOS 2 OR MYDOS`: this DOS takes up the memory
+  the file loads into (SpartaDOS does). Use Atari DOS 2.0S or 2.5, MyDOS,
+  or the MiSTer's loader.
+
+An 8K machine can't run a disk file at all; use the 400 tapes.
+
+Once the file is running, DOS has been overwritten (the test checks that
+RAM too). Pressing RESET then starts the machine again, as if switched on.
 
 ## Reading the results
 

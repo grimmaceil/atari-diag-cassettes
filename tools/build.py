@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Build the diag tapes: assemble with MADS, wrap as .cas, optionally deploy.
+"""Build the diag tapes and disk files: assemble with MADS, wrap as .cas
+(mkcas.py) and .xex (mkxex.py, XEXES), optionally deploy.
 
   python tools/build.py                 normal tapes into build/
   python tools/build.py --fault 2,5     also tapes with an injected fault
@@ -21,6 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MADS = ROOT / 'tools' / 'bin' / 'mads.exe'
 BUILD = ROOT / 'build'          # everything the assembler makes (not in git)
 CASSETTES = ROOT / 'cassettes'  # the release tapes (in git): what users load
+DISKS = ROOT / 'disks'          # the release disk files (.xex, in git)
 SHARE = Path('//TRUENAS/Media/games/ATARI800/_diag')   # the tapes, in the MiSTer Atari800 core's folder
 
 # Each tape: source dir, name, stages (first = boot), defines. A later stage
@@ -54,6 +56,11 @@ TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
           dict(N16, SETNO=3, WANT_KB=1, WANT_JOY=1, WANT_PAD=1, BIGSTAGE=1)),
          ('tape2', 'diag-400-memtest', ['main.asm'], {'OWNTEST': 1, 'NOXL': 1, 'NORAMK': 1}),
          ('bounce', 'diag-memtest', [], dict(N16, BOUNCE=1, BIGSTAGE=1, OWNTEST=1))]
+# The disk files (Atari-diag-disk-scope.md): the same programs as these
+# tapes, built with XEX (their own title bar, no NEEDPG: the wrapper's guard
+# checks the RAM before the file loads) and wrapped by mkxex.py.
+XEXES = [('one32', 'diag-32k-xl-xe', {}, 0x80),
+         ('bounce', 'diag-memtest', dict(BOUNCE=1, BIGSTAGE=1, OWNTEST=1), 0x40)]
 
 
 def mads(src, asm, out, defines):
@@ -94,7 +101,7 @@ def build(src, name, stages, defines, label):
                                    for k in range(2, len(stages) + 1)]
 
 
-def build_bounce(name, defines, label):
+def build_bounce(name, defines, label, xex=None):
     """The 16K+ burn-in: tape 2 with BOUNCE. Its relocation bitmap marks the
     bytes that hold its own page numbers: assembled at $0800 and at $0C00,
     those bytes differ by exactly 4 (4 pages, not 1: the screen block is
@@ -136,9 +143,7 @@ def build_bounce(name, defines, label):
             sys.exit(f'build_bounce: copy B ({off:#04x} pages up) differs at ${bad:04X}')
     print(f'{name}: copy A $0800-${lab["BSS"] - 1:04X}, copy B {boff:#04x} pages up, '
           f'{sum(bin(x).count("1") for x in bits)} relocated bytes')
-    subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
-                    '--boot', f'{out}.bin', f'{out}.lab', '--name', label], check=True)
-    return [Path(f'{out}.cas')]
+    return wrap(out, label, xex)
 
 
 def build_one16(name, defines, label):
@@ -169,7 +174,7 @@ def build_one16(name, defines, label):
     return [Path(f'{out}.cas')]
 
 
-def build_one32(name, defines, label):
+def build_one32(name, defines, label, xex=None):
     """The one-load 32k+ tape: tape 1's stage 1 (ONE16, ONE32) with, at
     PAYAT, stage 2 and then the system tests (SYSAT), all three sharing
     stage 1's BSS page. No size depends on an address: a few rounds settle
@@ -193,7 +198,7 @@ def build_one32(name, defines, label):
         b2 = Path(f'{s2}.bin').read_bytes()
         dsy = dict(ALL7, SETNO=4, MENU=1, CHAIN=1, SYSAT=f'${sysat:04X}',
                    SHAREBSS=f"${s1['BSS']:04X}", PREVBSS=f"${s1['BSS']:04X}",
-                   RAMAGAIN=f"${s1['AGAIN']:04X}")
+                   RAMAGAIN=f"${s1['AGAIN']:04X}", **({'XEX': 1} if xex else {}))
         mads('system', 'main.asm', sy, dsy)
         pay.write_bytes(b2 + Path(f'{sy}.bin').read_bytes())
         mads('tape1', 'main.asm', out, d1)
@@ -203,6 +208,16 @@ def build_one32(name, defines, label):
         s1 = new
     else:
         sys.exit('build_one32: did not settle')
+    return wrap(out, label, xex)
+
+
+def wrap(out, label, xex):
+    """The boot image as a tape, or with xex (the RAM needed, in pages) as a
+    disk file, out.xex."""
+    if xex:
+        subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkxex.py'), f'{out}.xex',
+                        '--boot', f'{out}.bin', f'{out}.lab', '--needpg', str(xex)], check=True)
+        return [Path(f'{out}.xex')]
     subprocess.run([sys.executable, str(ROOT / 'tools' / 'mkcas.py'), f'{out}.cas',
                     '--boot', f'{out}.bin', f'{out}.lab', '--name', label], check=True)
     return [Path(f'{out}.cas')]
@@ -241,10 +256,21 @@ def main():
                 tag += f'-e{every[0]}'
             cas += build(src, f'{name}-FAULT-{tag}', stages, fd,
                          f'A8 {name.upper()} FAULT {tag}')
+    xexes = []
+    for src, name, defs, need in XEXES:
+        d = dict(defs, XEX=1, **({'FAST': 1} if a.fast else {}))
+        b = build_one32 if src == 'one32' else build_bounce
+        for f in b(f'{name}-xex', d, '', need):
+            f = f.replace(f.with_name(f'{name}.xex'))
+            xexes.append(f)
     CASSETTES.mkdir(exist_ok=True)
+    DISKS.mkdir(exist_ok=True)
     for c in cas:
         if 'FAULT' not in c.name:       # fault-injection builds stay in build/
             shutil.copy2(c, CASSETTES / c.name)
+    for x in xexes:
+        shutil.copy2(x, DISKS / x.name)
+    cas += xexes
     if a.nodeploy or a.fast:        # (FAST tapes skip test patterns: not for use)
         return
     for c in cas:                   # the release tapes to the share, for testing

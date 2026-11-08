@@ -13,6 +13,7 @@ Real hardware faults can be simulated, independent of the FAULT build flag:
   --mirror                 bank 3 aliases bank 2 (a missing address line)
 """
 import argparse
+import struct
 from pathlib import Path
 import os
 import random
@@ -565,6 +566,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('tape', help='a .cas (boot stage, then later stages read via SIOV) or a raw boot .bin')
     ap.add_argument('--ram', type=lambda x: int(x, 0), default=0xC000)
+    ap.add_argument('--memlo', type=lambda x: int(x, 0), default=0x1CFC,
+                    help='.xex: MEMLO as DOS leaves it (DOS 2.5: $1CFC)')
     ap.add_argument('--stuck')
     ap.add_argument('--mirror', action='store_true')
     ap.add_argument('--seconds', type=float, default=40,
@@ -614,7 +617,22 @@ def main():
         stuck = (lo, hi, 0xFF if lvl else 0xFF ^ m, m if lvl else 0)
 
     stream = []                            # records left on the tape
-    if a.tape.lower().endswith('.cas'):
+    xex = None
+    if a.tape.lower().endswith('.xex'):
+        # Load it as DOS does: segment by segment, INITAD after any segment
+        # that sets it, RUNAD at the end (xex_next, in the main loop). The
+        # image is the biggest segment; it runs at $0800.
+        raw = open(a.tape, 'rb').read()
+        assert raw[:2] == b'\xff\xff', 'not an Atari binary file'
+        xex, i = [], 2
+        while i < len(raw):
+            if raw[i:i + 2] == b'\xff\xff':
+                i += 2
+            st, en = struct.unpack('<HH', raw[i:i + 4])
+            xex.append((st, raw[i + 4:i + 5 + en - st]))
+            i += 5 + en - st
+        img = max((d for _, d in xex), key=len)
+    elif a.tape.lower().endswith('.cas'):
         recs = cas_records(a.tape)
         nrec = recs[0][4]
         img = b''.join(r[3:131] for r in recs[:nrec])
@@ -660,11 +678,29 @@ def main():
     # and $A000 with BASIC or a cartridge in (the tapes' NEEDPG check)
     hw.ram[0x6A] = min(a.ram, 0xC000, 0xA000 if a.basic else 0xC000) >> 8
     lowram_before = bytes(hw.ram[:0x800])
-    hw.ram[load:load + len(img)] = img
-
     mpu = MPU(memory=hw, pc=load + 6)
     hw.mpu = mpu
     mpu.sp = 0xF0
+    XSENT = 0x0700                         # where the "DOS" loader would be
+    if xex is not None:
+        hw.ram[0x2E7], hw.ram[0x2E8] = a.memlo & 0xFF, a.memlo >> 8
+        lowram_before = bytes(hw.ram[:0x800])
+
+        def xex_next():                    # load on to the next INITAD or the end
+            while xex:
+                st, d = xex.pop(0)
+                for k, v in enumerate(d):
+                    hw[st + k] = v         # (RAM that isn't there keeps nothing)
+                if st == 0x2E2:
+                    push(mpu, hw, (XSENT - 1) >> 8)
+                    push(mpu, hw, (XSENT - 1) & 0xFF)
+                    mpu.pc = d[0] | d[1] << 8
+                    return
+            mpu.pc = hw.ram[0x2E0] | hw.ram[0x2E1] << 8
+            print(f'xex loaded at {hw.line / LINES_PER_MS / 1000:.1f} s, run ${mpu.pc:04X}')
+        xex_next()
+    else:
+        hw.ram[load:load + len(img)] = img
     limit = None
     steps = 0
     entered = set()
@@ -692,10 +728,13 @@ def main():
             stream[:] = cas_records(a.insert[1])
             insert_at = None
             print(f'tape {a.insert[1]} started at {hw.line / LINES_PER_MS / 1000:.1f} s')
+        if xex is not None and mpu.pc == XSENT:
+            xex_next()
+            continue
         if mpu.pc == SIOV:
             siov(mpu, hw, stream)
             continue
-        if mpu.pc == 0x2006 and 0x2006 not in entered:
+        if mpu.pc == 0x2006 and 0x2006 not in entered and xex is None:   # (not .xex: its program has code there)
             entered.add(0x2006)
             print(f'stage 2 entered at {hw.line / LINES_PER_MS / 1000:.1f} s')
         mpu.step()
@@ -759,6 +798,8 @@ def main():
     # its log in $0500-$06FF.
     sio = set(range(0x300, 0x30C)) | set(range(0x3FD, 0x480)) | {0x22F, 0x230, 0x231,
           0x2C5, 0x2C6, 0x2C8, 0x2F3, 0x2F4, 0x4D, 0x222, 0x223} | set(range(0x500, 0x700))
+    if xex is not None:                  # the loader's RUNAD/INITAD; the mover's COLDST
+        sio |= {0x2E0, 0x2E1, 0x2E2, 0x2E3, 0x244}
     keep = [i for i in range(0x800) if not (0x80 <= i < 0x90 or 0x100 <= i < 0x200
                                             or i in sio)]
     print('low RAM preserved:', all(hw.ram[i] == lowram_before[i] for i in keep))

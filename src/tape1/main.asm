@@ -469,7 +469,11 @@ rs_bad	lda #<s_somefail
 ; ---------------------------------------------------------------------------
 ; Strings, in screen codes ($FF ends).
 	.if .def ONE32			; header prefix: the tape's name
+	.ifdef XEX			; the disk file (build.py)
+s_hpre	dta d' DIAG-32K-XEX  ',$FF
+	.else
 s_hpre	dta d' DIAG-32K-XL-XE  ',$FF
+	.endif
 	.elseif .def ONE16
 s_hpre	dta d' DIAG-16K-01-RAM  ',$FF
 	.else

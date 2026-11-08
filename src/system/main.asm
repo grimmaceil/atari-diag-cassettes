@@ -186,7 +186,11 @@ NPAT	= *-pats
 ; set, 1 = 16K, 3 = controls, 4 = 32k+), so it can't
 ; be taken for the machine found: that is the FOUND line below it.
 	.if SETNO=4
+	.ifdef XEX			; the disk file (build.py)
+s_hpre	dta d' DIAG-32K-XEX  ',$FF
+	.else
 s_hpre	dta d' DIAG-32K-XL-XE  ',$FF
+	.endif
 	.elseif SETNO=3
 s_hpre	dta d' DIAG-CONTROLS  ',$FF
 	.elseif SETNO=1
