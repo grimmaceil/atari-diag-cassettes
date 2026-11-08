@@ -124,6 +124,12 @@ or_xl	jsr crcnew		; XL/XE: the whole 16K image
 	lda #$C0
 	ldx #16
 	jsr crcpg
+	.ifdef CHAIN		; the 32k+ tape: ANTIC off first. The self-test
+	lda #0			; covers $5000-$57FF, where this tape keeps its
+	sta DMACTL		; screen and display list: ANTIC would run the
+	.endif			; ROM as a display list, follow its jumps, and
+				; stay lost after the RAM came back. (The other
+				; tapes' screens are all below $5000.)
 	lda PORTB		; the self-test ROM in, for $D000-$D7FF
 	sta PBSAVE
 	and #$7F
@@ -133,6 +139,9 @@ or_xl	jsr crcnew		; XL/XE: the whole 16K image
 	jsr crcpg
 	lda PBSAVE
 	sta PORTB
+	.ifdef CHAIN
+	jsr scr_re
+	.endif
 	lda #$D8
 	ldx #8
 	jsr crcpg
@@ -149,6 +158,22 @@ or_xl	jsr crcnew		; XL/XE: the whole 16K image
 	jsr crcpg
 	ldy #8
 	jmp crcput
+
+	.ifdef CHAIN
+; scr_re: ANTIC back on our display list (its address written again, since
+; ANTIC's own pointer may be anywhere), if the text screen is in use.
+scr_re	lda SCRON
+	beq sr_x
+	lda #<SCRDL
+	sta DLISTL
+	lda SCRPG
+	clc
+	adc #>SCRDL
+	sta DLISTH
+	lda #$22
+	sta DMACTL
+sr_x	rts
+	.endif
 
 ; osids: name each OSCRC. C set if any OS ROM is unknown (on the XL/XE:
 ; the whole image, unless both halves are known).
