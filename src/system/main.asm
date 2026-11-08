@@ -187,23 +187,28 @@ NPAT	= *-pats
 	icl '../common/info.asm'
 	icl 'common.asm'
 
-; The header bar: " A8 DIAG 400 TAPE 3 " (SETNO 0 = 400, 1 = 16K), or the
-; 48k tape's own name (SETNO 2), or the controls tape's (SETNO 3: keyboard,
-; joysticks and paddles only, for alongside the SALT disks, no harness).
+; The header bar names the tape, as its file is named (SETNO 0 = the 400
+; set, 1 = 16K, 2 = the old 48k tape, 3 = controls, 4 = 32k+), so it can't
+; be taken for the machine found: that is the FOUND line below it.
 	.if SETNO=2
-s_hpre	dta d' A8 DIAG 48K+ XL/XE ',$FF
+s_hpre	dta d' DIAG-48K-XL-XE  ',$FF
 	.elseif SETNO=4
-s_hpre	dta d' A8 DIAG 32K+ XL/XE ',$FF
+s_hpre	dta d' DIAG-32K-XL-XE  ',$FF
 	.elseif SETNO=3
-s_hpre	dta d' A8 DIAG  CONTROLS  ',$FF
+s_hpre	dta d' DIAG-CONTROLS  ',$FF
+	.elseif SETNO=1
+s_hpre	dta d' DIAG-16K-02-SYSTEM  ',$FF
 	.else
-s_hpre	dta d' A8 DIAG '
-	.if SETNO=0
-	dta d'400'
+s_hpre	dta d' DIAG-400-0',[TAPENO+$10]
+	.if TAPENO=2
+	dta d'-ROM  ',$FF
+	.elseif TAPENO=3
+	dta d'-INPUT  ',$FF
+	.elseif TAPENO=4
+	dta d'-PORTS  ',$FF
 	.else
-	dta d'16K'
+	dta d'-AV  ',$FF
 	.endif
-	dta d' TAPE ',[TAPENO+$10],d' ',$FF
 	.endif
 
 ; Pad to a whole page; the last two bytes hold the image sum (mkcas.py).

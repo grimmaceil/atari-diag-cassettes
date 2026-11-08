@@ -460,7 +460,9 @@ class Auto:
 
     def check(self):
         text = self.hw.screen()
-        if 'SELECT=DOWN' in text:            # the 16k/48k menu
+        # the menu: its key line at a row's start (the RAM tapes' page test
+        # shows the program's own pages, strings and all, as a jumble on top)
+        if '|START=RUN  SELECT=DOWN' in text:   # (rows are 'NN|text')
             sel = [l for l in text.splitlines() if any(c.islower() for c in l[3:])]
             sig = 'MENU|' + '|'.join(sel)
             if sig not in self.seen:
@@ -575,7 +577,7 @@ def main():
     ap.add_argument('--snap', default='', help='seconds at which to print the screen')
     ap.add_argument('--shot', default='', help='SECS:FILE.png,... : save the screen as a picture')
     ap.add_argument('--shoton', action='append', default=[],
-                    help='TEXT@SECS@FILE.png : a picture SECS after TEXT first shows on screen')
+                    help='TEXT@SECS@FILE.png : a picture SECS after TEXT first shows on screen (^TEXT: at a row start)')
     ap.add_argument('--osrom', help='a real OS ROM file (10K 400/800 or 16K XL/XE) instead of the stand-in')
     ap.add_argument('--basic', help='a real 8K BASIC ROM: XL/XE built in, or a 400/800 cartridge')
     ap.add_argument('--palette', default='//TRUENAS/Media/games/ATARI800/ntsc.act',
@@ -701,7 +703,8 @@ def main():
             next_look = hw.line + 2000
             text = hw.screen()
             for w in when:
-                if w[3] is None and w[0] in text:
+                if w[3] is None and (w[0] in text if not w[0].startswith('^') else
+                                     '|' + w[0][1:] in text):
                     w[3] = hw.line + w[1]
                 if w[3] is not None and w[3] >= 0 and hw.line >= w[3]:
                     hw.render(w[2], palette, font)

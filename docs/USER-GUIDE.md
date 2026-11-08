@@ -51,7 +51,7 @@ only need the file with a player that doesn't stop between the parts (see
 
 1. Turn the Atari off.
 2. Hold **START**. **Take out any cartridge** (BASIC included) for a full
-   RAM test: a cartridge covers 8K of RAM, and the machine line then says
+   RAM test: a cartridge covers 8K of RAM, and the `FOUND:` line then says
    `CART IN`. An XL or XE's built-in BASIC doesn't matter: the tapes switch
    it off themselves.
 3. Turn the Atari on, still holding the keys. It beeps once.
@@ -107,6 +107,17 @@ converter, and the audio recorded onto a tape for an Atari 410 or 1010
 recorder. This hasn't been tried with these tapes yet.
 
 ## Reading the results
+
+### The top of every screen
+
+The bar along the top names **the tape** you loaded, then the test on
+screen: for example `DIAG-16K-02-SYSTEM  2 KEYBOARD`. That's the tape's
+name, not what it found out about your machine.
+
+What the tape **found** is the line below it: `FOUND:` the machine type
+(400/800 or XL/XE), all the RAM it found, PAL or NTSC, and `CART IN` if a
+cartridge is plugged in. So a 32k+ tape on an 800 with 48K shows
+`DIAG-32K-XL-XE` on top and `FOUND: 400/800  RAM 48K  NTSC` below.
 
 ### Colours
 
@@ -369,7 +380,8 @@ On machines with 16K or more, all seven tests are on one tape with a menu.
 4. The keys: START runs the highlighted line, SELECT moves down, OPTION
    moves up, and 1-7 run that test. After a test the next one is
    highlighted, so pressing START again and again goes through them all.
-   On `diag-32k-xl-xe`, 0 runs the whole RAM test again.
+   On `diag-32k-xl-xe` there's one more line, `0 RAM TEST AGAIN` (see
+   below).
 
 Running a test again replaces its old result.
 
@@ -395,14 +407,18 @@ One tape, one load, for an 800 with 32K or 48K and every XL and XE:
 3. The result and what's next.
 4. START goes on to the system tests.
 
-5. The seven tests, with the menu. 0 runs the RAM test again:
+5. The seven tests, with the menu:
 
 ![32K menu](img/32k-02-menu.png)
 
 1. The tests.
 2. All of them, in order.
 3. The results.
-4. The keys, with 0 for the RAM test.
+4. `0 RAM TEST AGAIN`: the whole RAM test from the start, with the RAM
+   result so far beside it. Choose it with SELECT and START, or press 0.
+   After the RAM summary, START brings you back to this menu, with the
+   other tests cleared to `-`.
+5. The keys.
 
 At the end, RAM faults show up again as test 8, with the bank as the item:
 

@@ -421,7 +421,10 @@ mn_con	lsr
 	lsr
 	bcc mn_up
 	ldx MNT			; SELECT: down (the last line is MNT+1, the
-	inx			; results), round to the top
+	inx			; results, or MNT+2, the RAM test again),
+	.ifdef RAMAGAIN		; round to the top
+	inx
+	.endif
 	stx MTMP
 	ldx MSEL
 	cpx MTMP
@@ -434,6 +437,9 @@ mn_up	ldx MSEL		; OPTION: up, round to the bottom
 	bpl mn_set
 	ldx MNT
 	inx
+	.ifdef RAMAGAIN
+	inx
+	.endif
 mn_set	stx MSEL
 	jmp menu
 
@@ -445,6 +451,13 @@ mgo	jsr waitrel
 	cmp MNT
 	bcc mr_t
 	beq mr_all
+	.ifdef RAMAGAIN
+	sbc MNT			; (carry set) 1: the results, 2: the RAM test
+	cmp #2
+	bne mg_fin
+	jmp RAMAGAIN
+mg_fin
+	.endif
 	jmp final
 mr_all	inc MMODE		; all, from the first: every result starts clean
 	ldx #7			; (not test 8, the RAM stages' result)
@@ -543,6 +556,50 @@ md_r	txa
 	lda #<s_mres
 	ldy #>s_mres
 	jsr puts
+	.ifdef RAMAGAIN		; the 32k+ tape: the RAM test too, as key 0,
+	lda #0			; with its result so far (test 8)
+	sta INV
+	ldx MNT
+	inx
+	inx
+	cpx MSEL
+	bne md_g
+	lda #$80
+	sta INV
+md_g	txa
+	clc
+	adc #4
+	ldx #0
+	jsr at
+	lda #0
+	jsr putc
+	lda #<s_mram
+	ldy #>s_mram
+	jsr puts
+	lda #0
+	sta INV
+	ldx MNT
+	inx
+	inx
+	txa
+	clc
+	adc #4
+	ldx #20
+	jsr at
+	lda BADMASK+8
+	bne md_gf
+	lda #<s_pass
+	ldy #>s_pass
+	jsr puts
+	jmp md_gx
+md_gf	pha
+	lda #<s_fail
+	ldy #>s_fail
+	jsr puts
+	pla
+	jsr putitems
+md_gx
+	.endif
 	lda #0
 	sta INV
 	PRINT 18, 0, s_m1
@@ -556,7 +613,8 @@ s_mall	dta d'ALL OF THEM, IN ORDER',$FF
 s_mres	dta d'RESULTS AND THE FINAL CODE',$FF
 s_m1	dta d'START=RUN  SELECT=DOWN  OPTION=UP',$FF
 	.ifdef RAMAGAIN
-s_m2	dta d'1-7: THAT TEST   0: THE RAM TEST AGAIN',$FF
+s_m2	dta d'OR PRESS 0-7 TO RUN THAT TEST',$FF
+s_mram	dta d'0 RAM TEST AGAIN',$FF
 	.else
 s_m2	dta d'OR PRESS 1-7 TO RUN THAT TEST',$FF
 	.endif

@@ -61,8 +61,8 @@ ci_s	lda #<s_scr
 	jmp puthex
 
 
-s_800	dta d'MACHINE 400/800',$FF
-s_xl	dta d'MACHINE XL/XE',$FF
+s_800	dta d'FOUND: 400/800',$FF	; what the tape detected
+s_xl	dta d'FOUND: XL/XE',$FF
 s_ram	dta d'  RAM ',$FF
 s_pal	dta d'K  PAL',$FF
 s_ntsc	dta d'K  NTSC',$FF

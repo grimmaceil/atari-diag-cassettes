@@ -526,7 +526,15 @@ puts_st	pha
 	icl '../common/pagetest.asm'
 	.endif
 
-s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF
+	.if .def ONE32			; the tape's name
+s_hpre	dta d' DIAG-32K-XL-XE  ',$FF
+	.elseif .def ONE16
+s_hpre	dta d' DIAG-16K-01-RAM  ',$FF
+	.elseif .def ONELOAD
+s_hpre	dta d' DIAG-48K-XL-XE  ',$FF
+	.else
+s_hpre	dta d' DIAG-400-01-RAM  ',$FF
+	.endif
 	.ifdef ONELOAD
 s_hrel	dta d'IMAGE AREA',$FF
 	.else
@@ -583,7 +591,7 @@ s_nextbad dta d'FIX THIS FIRST, OR START: SYSTEM TESTS',$FF
 s_nextok dta d'ALL PASSED. NEXT: DIAG-16K-02-SYSTEM',$FF
 s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
 	.else
-s_nextok dta d'ALL PASSED. NEXT: TAPE 02 OF THE SET',$FF
+s_nextok dta d'ALL PASSED. NEXT: DIAG-400-02-ROM',$FF
 s_nextbad dta d'NEXT: FIX THIS ONE FIRST, THEN RE-RUN',$FF
 	.endif
 	.endif

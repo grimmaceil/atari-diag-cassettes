@@ -578,7 +578,15 @@ rs_bad	lda #<s_somefail
 
 ; ---------------------------------------------------------------------------
 ; Strings, in screen codes ($FF ends).
-s_hpre	dta d' A8 DIAG  RAM TEST  ',$FF	; header prefix (header inverts it)
+	.if .def ONE32			; header prefix: the tape's name
+s_hpre	dta d' DIAG-32K-XL-XE  ',$FF
+	.elseif .def ONE16
+s_hpre	dta d' DIAG-16K-01-RAM  ',$FF
+	.elseif .def ONELOAD
+s_hpre	dta d' DIAG-48K-XL-XE  ',$FF
+	.else
+s_hpre	dta d' DIAG-400-01-RAM  ',$FF
+	.endif
 s_hvid	dta d'VIDEO CHECK',$FF
 s_hram	dta d'RAM TEST',$FF
 s_v1	dta d'CAN YOU READ THIS AND SEE 8 COLOR BARS?',$FF

@@ -55,17 +55,17 @@ RUNS = {
         ('PLAYING VOICE 2', 0.4, 'av-01-pokey'),
         ('RAMPS RIGHT?', 1, 'av-02-gtia')]),
     'menu': ('diag-16k-02-system', ['--ram', '0x8000', '--auto', '--until', '400'], [
-        ('SELECT=DOWN', 0.5, 'system-01-menu'),
-        ('START=MENU', 1, 'system-02-results')]),
+        ('^START=RUN', 0.5, 'system-01-menu'),
+        ('^START=MENU', 1, 'system-02-results')]),
     '16k': ('build/t16-fast', ['--ram', '0x4000', '--key', '10', '--until', '400'], [
-        ('START=AGAIN', 2, '16k-01-summary')]),
+        ('^START=AGAIN', 2, '16k-01-summary')]),
     '32k-sum': ('build/t32-fast', ['--xl', '--basic', '@BASIC', '--key', '10',
                                    '--until', '600'], [        # (no --auto: it waits)
-        ('START=SYSTEM TESTS', 2, '32k-01-summary')]),
+        ('^START=SYSTEM TESTS', 2, '32k-01-summary')]),
     '32k': ('build/t32-fast', ['--xl', '--auto', '--basic', '@BASIC', '--key', '10',
                                '--until', '1200'], [
-        ('SELECT=DOWN', 0.5, '32k-02-menu'),
-        ('START=MENU', 1, '32k-03-results')]),
+        ('^START=RUN', 0.5, '32k-02-menu'),
+        ('^START=MENU', 1, '32k-03-results')]),
     'memtest': ('diag-memtest', ['--ram', '0x8000', '--stuck', '23FC-23FF:3:1',
                                  '--key', '150', '--until', '220'], [
         ('PASS 4', 3, 'memtest-01-running'),
@@ -97,7 +97,7 @@ ANNOT = {
     'system-02-results': [(4, 10, 1), (12, 16, 2)],
     '16k-01-summary': [(5, 7, 1), (8, 11, 2), (14, 16, 3), (23, 23, 4)],
     '32k-01-summary': [(5, 7, 1), (8, 12, 2), (14, 16, 3), (23, 23, 4)],
-    '32k-02-menu': [(4, 10, 1), (11, 11, 2), (12, 12, 3), (18, 19, 4)],
+    '32k-02-menu': [(4, 10, 1), (11, 11, 2), (12, 12, 3), (13, 13, 4), (18, 19, 5)],
     '32k-03-results': [(4, 10, 1), (11, 11, 2), (13, 16, 3)],
     'memtest-01-running': [(5, 5, 1), (6, 6, 2), (8, 9, 3), (23, 23, 4)],
     'memtest-02-summary': [(5, 6, 1), (8, 9, 2)],
