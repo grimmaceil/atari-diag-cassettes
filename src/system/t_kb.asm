@@ -8,31 +8,24 @@ KBSEEN	= TSCR+$00		; 8: KBCODEs seen, one bit each
 KBX	= TSCR+$08		; bit 0 SHIFT, 1 CONTROL, 2 BREAK seen
 KBLEFT	= TSCR+$09		; required keys still to press
 KBPREV	= TSCR+$0A		; SKSTAT bit 2 last frame (key held = 0)
-LCOL	= TSCR+$0B		; light: column of the character being lit
-LPMY	= TSCR+$0C		; light: P/M byte of the key's text row
+BLK	= TSCR+$0B		; kbblink: frame count
+BLON	= TSCR+$0C		; kbblink: 0 = held keys inverse now, 8 = normal
 KACT	= TSCR+$0D		; offset of the key shown held ($FF: none)
 KCACT	= TSCR+$0E		; nonzero: CONTROL shown held
 SHACT	= TSCR+$0F		; nonzero: SHIFT shown held
 BRKT	= TSCR+$10		; frames BREAK stays shown held (it has no key-up)
-LMODE	= TSCR+$11		; light: $80 held (inverse + P/M), 0 back to done
+LMODE	= TSCR+$11		; light: $80 inverse, 0 normal
 LXS	= TSCR+$12		; light: caller's X; kbinv: its Y (+1)
 
 KBROW	= 8			; first row of the on-screen keyboard
 
-; Each key shows one of three states, told apart by brightness so they read
-; on a monochrome screen and without color vision:
-;   not pressed yet   light letters on black
-;   done              light letters on a mid green cell (P/M behind it)
-;   held now          the same cell inverted: bright cell, darker letters
-; GR.0 gives every character the same hue, but a player in front of the
-; playfield lends its color to the cell and the letters keep the text
-; brightness.
-; Four quad-width players and four quad-width missiles are one bit per
-; character column, so their memory is a color mask for the text screen.
-; Double-line resolution, PM block at $0400: missiles $0580, players
-; $0600-$07FF (free low RAM once the boot is done).
-PMPAGE	= $04
-C_LIT	= $C6			; behind a done key: luminance 6, between black and the text's 12
+; Each key shows one of three states, told apart without color, so they
+; read on a monochrome screen too:
+;   not pressed yet   normal video
+;   done              inverse
+;   held now          inverse, blinking (kbblink)
+; (A P/M color overlay was tried for these: on the MiSTer its missiles drew
+; stripes down the screen, and text alone is enough.)
 
 
 t_kb	lda #2
@@ -70,13 +63,8 @@ kb_rows	stx CNT
 	inx
 	cpx #KBROWS
 	bne kb_rows
-	jsr pmon
-	PRINT KBROW+5, 0, s_kb2	; the legend, in its own states
+	PRINT KBROW+5, 0, s_kb2	; the legend, DONE in inverse
 	lda #KL_DONE
-	jsr light
-	lda #KL_DONE
-	jsr unlit
-	lda #KL_HELD
 	jsr light
 
 kb_stk	lda SKSTAT		; stuck: a key or SHIFT down before any was asked
@@ -98,6 +86,7 @@ kb_go	lda #$80		; BREAK: latched by POKEY's IRQ status (masked)
 
 kb_lp	jsr vsync
 	jsr showleft
+	jsr kbblink
 	lda SKSTAT		; a new key down?
 	and #4
 	tax
@@ -125,18 +114,18 @@ kb_sh	lda SKSTAT		; SHIFT: held while bit 3 = 0
 	jmp kb_br
 kb_shup	lda SHACT
 	beq kb_br
-	lda #0
+	lda #0			; let go: done (inverse, steady)
 	sta SHACT
 	lda #KO_SHIFT1
-	jsr unlit
+	jsr light
 	lda #KO_SHIFT2
-	jsr unlit
+	jsr light
 kb_br	lda BRKT		; BREAK: shown held for a moment
 	beq kb_brk
 	dec BRKT
 	bne kb_brk
 	lda #KO_BREAK
-	jsr unlit
+	jsr light
 kb_brk	lda IRQST
 	bmi kb_st
 	lda #0
@@ -158,8 +147,7 @@ kb_done
 
 	lda #0
 	sta IRQEN
-	jsr kbinv		; the pressed keys in inverse: the result screen
-	jsr pmoff		; has no P/M colors (nor do the flashes)
+	jsr kbinv		; the pressed keys in inverse (none left blinking)
 	jsr waitrel
 	lda KBLEFT
 	beq kb_end
@@ -225,7 +213,7 @@ ki_x	rts
 kbup	lda KACT
 	cmp #$FF
 	beq ku_c
-	jsr unlit
+	jsr light		; (inverse, steady: done)
 	lda #$FF
 	sta KACT
 ku_c	lda KCACT
@@ -233,7 +221,7 @@ ku_c	lda KCACT
 	lda #0
 	sta KCACT
 	lda #KO_CTRL
-	jmp unlit
+	jmp light
 ku_x	rts
 
 ; kbdown: KBCODE A was pressed: show it (and CONTROL) held, count it.
@@ -290,29 +278,15 @@ kbextra	tax
 	dec KBLEFT
 ke_x	rts
 
-; light: show the key label at keyboard offset A (up to the next space) held:
-; inverse, with the P/M color behind it, which stays when unlit puts the
-; label back to normal video (done). Keeps X.
+; light: the key label at keyboard offset A (up to the next space) in
+; inverse (done, or held and blinking on); unlit: back to normal video
+; (held, blinking off). Keeps X.
 light	ldy #$80
 	bne li_go
 unlit	ldy #0
 li_go	sty LMODE
 	ldy DISPOK
 	beq li_x
-	stx LXS
-	pha
-	ldx #16+KBROW*4		; P/M byte of text row 0 is 16 (scan line 32)
-li_dv	cmp #40			; offset -> row (X, 4 bytes a row) and column
-	bcc li_rc
-	sbc #40
-	inx
-	inx
-	inx
-	inx
-	bne li_dv
-li_rc	sta LCOL
-	stx LPMY
-	pla
 	clc
 	adc #<[KBROW*40]
 	sta CUR
@@ -322,113 +296,47 @@ li_rc	sta LCOL
 	ldy #0
 li_lp	lda (CUR),y
 	and #$7F
-	beq li_end		; the space after the label
+	beq li_x		; the space after the label
 	cmp #$7F
-	beq li_end		; the row's $FF end
+	beq li_x		; the row's $FF end
 	ora LMODE
 	sta (CUR),y
-	bit LMODE
-	bpl li_nx
-	jsr pmset
-li_nx	inc LCOL
 	iny
 	bne li_lp
-li_end	ldx LXS
 li_x	rts
 
-; pmset: set column LCOL's bit in the P/M mask for the 4 bytes (8 scan
-; lines) from LPMY. Columns 0-31: player LCOL/8, bit 7 leftmost; 32-39:
-; missile (LCOL-32)/2, two bits each, M0 in bits 0-1. Keeps Y.
-pmset	tya
-	pha
-	lda LCOL
-	cmp #32
-	bcs pm_m
-	tay
+; kbblink: every 8 frames, the keys held now (and SHIFT, CONTROL, BREAK)
+; between inverse and normal.
+kbblink	inc BLK
+	lda BLK
 	and #7
-	tax
-	lda pmpbit,x
-	sta MTMP
-	tya
-	lsr			; player number; the high half of it picks the
-	lsr			; page, the low bit the half page
-	lsr
-	lsr
-	tax
-	lda #0
-	ror
-	ora LPMY
-	sta PTR
-	txa
-	clc
-	adc #PMPAGE+2
-	sta PTR+1
-	bne pm_set
-pm_m	and #7
-	tax
-	lda pmmbit,x
-	sta MTMP
-	lda LPMY
-	ora #$80
-	sta PTR
-	lda #PMPAGE+1
-	sta PTR+1
-pm_set	ldy #3
-pm_lp	lda (PTR),y
-	ora MTMP
-	sta (PTR),y
-	dey
-	bpl pm_lp
-	pla
-	tay
-	rts
-pmpbit	.byte $80, $40, $20, $10, $08, $04, $02, $01
-pmmbit	.byte $02, $01, $08, $04, $20, $10, $80, $40
-
-; pmon: clear the P/M block, line the players and missiles up with the 40
-; columns (playfield starts at color clock 48, 4 clocks a column) and start
-; P/M DMA. Only with the text screen on.
-pmon	lda #0
-	tay
-pn_clr	sta PMPAGE*$100+$100,y
-	sta PMPAGE*$100+$200,y
-	sta PMPAGE*$100+$300,y
-	iny
-	bne pn_clr
-	ldx #7
-pn_pos	lda pmhpos,x
-	sta HPOSP0,x
-	dex
-	bpl pn_pos
-	ldx #3
-pn_sz	lda #3
-	sta SIZEP0,x
-	lda #C_LIT
-	sta COLPM0,x
-	dex
-	bpl pn_sz
-	lda #$FF
-	sta SIZEM
-	lda #1
-	sta PRIOR
-	lda #PMPAGE
-	sta PMBASE
-	lda #$2E		; + missile and player DMA, double-line
-	sta DMACTL
-	lda #3
-	sta GRACTL
-	rts
-pmhpos	.byte 48, 80, 112, 144, 176, 184, 192, 200
-
-; pmoff: P/M off and out of sight ($D000-$D011: positions, sizes and the
-; graphics latches all 0). The display list DMA stays as it was.
-pmoff	lda #0
-	sta GRACTL
-	ldx #$11
-pf_lp	sta HPOSP0,x
-	dex
-	bpl pf_lp
-	sta PRIOR
+	bne bl_x
+	lda BLK
+	and #8
+	sta BLON
+	lda KACT
+	cmp #$FF
+	beq bl_c
+	jsr blset
+bl_c	lda KCACT
+	beq bl_s
+	lda #KO_CTRL
+	jsr blset
+bl_s	lda SHACT
+	beq bl_b
+	lda #KO_SHIFT1
+	jsr blset
+	lda #KO_SHIFT2
+	jsr blset
+bl_b	lda BRKT
+	beq bl_x
+	lda #KO_BREAK
+	jmp blset
+bl_x	rts
+blset	ldx BLON
+	bne bs_off
+	jmp light
+bs_off	jmp unlit
 pf_x	rts
 
 ; showleft: "KEYS LEFT nn" on row 14.
@@ -458,9 +366,8 @@ click	lda #$08
 kbrtab	.word kbrow0, kbrow1, kbrow2, kbrow3, kbrow4
 
 s_kb1	dta d'PRESS EVERY KEY. START ENDS THE TEST.',$FF
-s_kb2	dta d'NOT PRESSED YET  DONE  HELD',$FF
+s_kb2	dta d'PLAIN=TO DO  INVERSE=DONE  BLINK=HELD',$FF
 s_kb3	dta d'INVERSE: PRESSED. NORMAL: NOT PRESSED',$FF
-KL_DONE	= 5*40+17		; legend words, as keyboard offsets
-KL_HELD	= 5*40+23
+KL_DONE	= 5*40+13		; the legend's INVERSE=DONE, as a keyboard offset
 s_stuck	dta d'A KEY WAS DOWN AT THE START: STUCK?'*,$FF
 s_kleft	dta d'KEYS LEFT ',$FF

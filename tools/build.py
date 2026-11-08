@@ -44,6 +44,8 @@ TAPES = [('tape1', 'diag-400-01-ram', ['main.asm', 'stage2.asm'], {}),
          ('system', 'diag-16k-02-system', ['main.asm'],
           dict(ALL7, SETNO=1, TAPENO=2, MENU=1, BIGSTAGE=1)),
          ('oneload', 'diag-48k-xl-xe', [], dict(ALL7, SETNO=2, MENU=1)),
+         ('system', 'diag-controls', ['main.asm'],
+          dict(SETNO=3, WANT_KB=1, WANT_JOY=1, WANT_PAD=1, BIGSTAGE=1)),
          ('tape2', 'diag-400-burnin', ['main.asm'], {'OWNTEST': 1, 'NOXL': 1}),
          ('bounce', 'diag-burnin', [], {'BOUNCE': 1, 'BIGSTAGE': 1, 'OWNTEST': 1})]
 

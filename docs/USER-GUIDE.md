@@ -31,6 +31,7 @@ differ a little.
 | 400 or 800 with 16K or 32K | `diag-16k-01-ram`, `diag-16k-02-system`, and `diag-burnin` |
 | 800 with 48K, any XL or XE | `diag-48k-xl-xe` (one tape does it all), and `diag-burnin` |
 | **any machine that won't get through its own set** | **the 400 set**: it only needs the first 8K of RAM to work |
+| keyboard, joysticks and paddles only (16K and up) | `diag-controls`: just those three tests, no harness needed. A companion to Atari's SALT diagnostic disks, whose controller tests need a test harness |
 
 Not sure how much RAM there is? Start with `diag-400-01-ram`: it measures
 the RAM and shows it on screen.
@@ -119,8 +120,7 @@ unreadable or the screen is switched off:
 | ![](img/color-red-flash.png) | bright red flash | `#D15D57` | a fault beep (see the beep code below) |
 | ![](img/color-purple.png) | purple | `#AD3C9F` | waiting for you: a question to answer, or the video check's last chance |
 
-On the text screens the text is light grey (`#CBC3D0`) on black. In the
-keyboard test, a key you've already pressed sits on dark green (`#008039`).
+On the text screens the text is light grey (`#CBC3D0`) on black.
 
 You never need colour to read a result: every colour comes with a sound,
 and on a working screen with text as well.
@@ -241,17 +241,17 @@ twice; 5 OS chips from different revisions.
 ### Keyboard and console keys (`diag-400-03-input`; tests 2 and 3)
 
 **Keyboard.** Press every key. Each key on the map shows one of three
-states, told apart by brightness, so this works on a black-and-white screen
+states, without needing colour, so this works on a black-and-white screen
 too:
 
 ![Keyboard test](img/input-01-keyboard.png)
 
-1. The key map. Not pressed yet: light letters on black. Done: on green.
-   Held down now: a bright block with dark letters. The four arrow keys are
+1. The key map. Not pressed yet: normal. Done: inverse. Held down now:
+   inverse, blinking. The four arrow keys are
    CONTROL with `-` `=` `+` `*`, so those keys carry the arrows. CONTROL
    lights only together with another key: the Atari can't see CONTROL on
    its own.
-2. The legend, drawn in the three states.
+2. The legend.
 3. How many keys are left. HELP and F1-F4 (XL/1200XL) show but aren't
    required.
 

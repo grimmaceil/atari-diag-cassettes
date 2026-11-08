@@ -21,6 +21,7 @@ checked.
    | 400/800 with 16K-32K | `diag-16k-01-ram`, `diag-16k-02-system`, `diag-burnin` |
    | 800 with 48K, XL, XE | `diag-48k-xl-xe` (one tape), `diag-burnin` |
    | anything that won't get through its own set | the 400 set |
+   | keyboard, joysticks, paddles only (16K+) | `diag-controls`: no test harness needed; goes with Atari's SALT disks |
 
 2. Load the first tape: hold START (START and OPTION on an XL/XE), switch
    the machine on, start the tape and press a key when it beeps. You can

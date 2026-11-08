@@ -184,9 +184,12 @@ NPAT	= *-pats
 	icl 'common.asm'
 
 ; The header bar: " A8 DIAG 400 TAPE 3 " (SETNO 0 = 400, 1 = 16K), or the
-; 48k tape's own name (SETNO 2).
+; 48k tape's own name (SETNO 2), or the controls tape's (SETNO 3: keyboard,
+; joysticks and paddles only, for alongside the SALT disks, no harness).
 	.if SETNO=2
 s_hpre	dta d' A8 DIAG 48K+ XL/XE ',$FF
+	.elseif SETNO=3
+s_hpre	dta d' A8 DIAG  CONTROLS  ',$FF
 	.else
 s_hpre	dta d' A8 DIAG '
 	.if SETNO=0

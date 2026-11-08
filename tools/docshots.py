@@ -129,7 +129,6 @@ COLORS = [
     ('purple', 0x56, 'waiting for you: a question, or the video check\'s last chance'),
     ('black', 0x00, 'the text background'),
     ('text', 0x0C, 'the text (luminance 12)'),
-    ('done key', 0xC6, 'keyboard map: a key already pressed'),
 ]
 
 
